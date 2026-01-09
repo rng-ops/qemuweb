@@ -1,0 +1,200 @@
+---
+title: Quick Start
+description: Get your first virtual machine running in 5 minutes
+---
+
+import { Steps, Aside, Code, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This guide will get you from zero to a running VM in just a few minutes.
+
+## Prerequisites
+
+Before starting, ensure you have:
+- Node.js 18+ installed
+- pnpm (recommended) or npm
+- A modern browser (Chrome, Firefox, or Edge)
+
+<Aside>
+  The development server automatically sets the required Cross-Origin Isolation headers.
+</Aside>
+
+## Installation
+
+<Steps>
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/user/qemuweb.git
+   cd qemuweb
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   pnpm install
+   ```
+
+3. **Build all packages**
+
+   ```bash
+   pnpm build
+   ```
+
+4. **Start the development server**
+
+   ```bash
+   pnpm --filter=@qemuweb/web dev
+   ```
+
+5. **Open in browser**
+
+   Navigate to `http://localhost:5173` in your browser.
+
+</Steps>
+
+## Using QemuWeb Programmatically
+
+If you want to integrate QemuWeb into your own application:
+
+### Install the packages
+
+```bash
+pnpm add @qemuweb/runtime @qemuweb/vm-config @qemuweb/storage
+```
+
+### Basic Usage
+
+```typescript
+import { QemuClient } from '@qemuweb/runtime';
+import { profiles } from '@qemuweb/vm-config';
+
+// Initialize the client
+const client = new QemuClient({
+  workerUrl: '/worker.js',
+  wasmUrl: '/qemu-system-x86_64.wasm',
+});
+
+// Listen for events
+client.on('capabilities', (caps) => {
+  console.log('Browser capabilities:', caps);
+});
+
+client.on('vmStarted', () => {
+  console.log('VM is running!');
+});
+
+client.on('serial', (data) => {
+  // Output from the VM's serial console
+  document.getElementById('terminal').textContent += data;
+});
+
+client.on('error', (error) => {
+  console.error('VM error:', error);
+});
+
+// Start the VM
+await client.start(profiles.alpineLinux);
+```
+
+### Sending Input to the VM
+
+```typescript
+// Send keyboard input to the serial console
+client.sendSerial('ls -la\n');
+
+// Send a command and wait for output
+client.sendSerial('echo "Hello, QemuWeb!"\n');
+```
+
+### Stopping the VM
+
+```typescript
+// Gracefully stop the VM
+await client.stop();
+
+// Sync any pending writes to IndexedDB
+await client.syncOverlay();
+```
+
+## Using with React
+
+```tsx
+import { useEffect, useRef } from 'react';
+import { QemuClient } from '@qemuweb/runtime';
+import { profiles } from '@qemuweb/vm-config';
+import { Terminal } from 'xterm';
+
+function VMTerminal() {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const clientRef = useRef<QemuClient | null>(null);
+
+  useEffect(() => {
+    const terminal = new Terminal();
+    terminal.open(terminalRef.current!);
+
+    const client = new QemuClient({
+      workerUrl: '/worker.js',
+      wasmUrl: '/qemu-system-x86_64.wasm',
+    });
+    clientRef.current = client;
+
+    // Connect terminal to VM
+    client.on('serial', (data) => terminal.write(data));
+    terminal.onData((data) => client.sendSerial(data));
+
+    // Start VM
+    client.start(profiles.alpineLinux);
+
+    return () => {
+      client.stop();
+      terminal.dispose();
+    };
+  }, []);
+
+  return <div ref={terminalRef} style={{ height: '400px' }} />;
+}
+```
+
+## Available VM Profiles
+
+QemuWeb comes with pre-configured profiles for common use cases:
+
+| Profile | Description | RAM | Architecture |
+|---------|-------------|-----|--------------|
+| `alpineLinux` | Minimal Alpine Linux | 128MB | x86_64 |
+| `alpineRouter` | BusyBox-based router | 64MB | x86_64 |
+| `devContainer` | Development environment | 256MB | x86_64 |
+
+```typescript
+import { profiles } from '@qemuweb/vm-config';
+
+// Use a pre-defined profile
+await client.start(profiles.alpineLinux);
+
+// Or customize a profile
+await client.start({
+  ...profiles.alpineLinux,
+  memory: 256, // Override RAM
+});
+```
+
+## What's Next?
+
+<Tabs>
+  <TabItem label="Learn More">
+    - [Architecture Overview](/qemuweb/architecture/overview/) - Understand how it works
+    - [Storage System](/qemuweb/architecture/storage/) - Learn about persistence
+    - [Virtual Networking](/qemuweb/architecture/networking/) - Set up complex topologies
+  </TabItem>
+  <TabItem label="API Reference">
+    - [QemuClient API](/qemuweb/api/qemu-client/) - Full client documentation
+    - [Block Devices](/qemuweb/api/block-devices/) - Storage layer APIs
+    - [VM Configuration](/qemuweb/api/vm-config/) - Configuration options
+  </TabItem>
+  <TabItem label="Advanced">
+    - [AI Integration](/qemuweb/ai/langgraph-agent/) - Use AI to control VMs
+    - [MCP Servers](/qemuweb/ai/mcp-servers/) - Model Context Protocol
+    - [Contributing](/qemuweb/contributing/setup/) - Help improve QemuWeb
+  </TabItem>
+</Tabs>

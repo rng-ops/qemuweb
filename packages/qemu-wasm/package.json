@@ -1,0 +1,32 @@
+{
+  "name": "@qemuweb/qemu-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QEMU runtime environment - Rust-based V8 superset for deterministic computation",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./qemu.js": "./dist/qemu.js",
+    "./qemu.wasm": "./dist/qemu.wasm"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:wasm": "pnpm build:docker",
+    "build:docker": "docker build -t qemu-wasm-builder . && docker run --rm -v $(pwd)/dist:/output qemu-wasm-builder",
+    "build:local": "./scripts/build.sh",
+    "clean": "rm -rf dist qemu-src emsdk",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

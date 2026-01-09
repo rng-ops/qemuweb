@@ -1,0 +1,105 @@
+---
+title: Introduction
+description: Learn what QemuWeb is and how it enables virtual machines in your browser
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+QemuWeb is a groundbreaking project that brings full virtual machine emulation to web browsers using WebAssembly. It compiles QEMU—the industry-standard open-source emulator—to run entirely in your browser, enabling you to boot complete operating systems without any local installation.
+
+## What is QemuWeb?
+
+QemuWeb is a monorepo containing several packages that work together to provide a complete virtualization solution:
+
+<CardGrid>
+  <Card title="@qemuweb/runtime" icon="rocket">
+    The core runtime that manages VM lifecycle, worker communication, and event handling.
+  </Card>
+  <Card title="@qemuweb/storage" icon="document">
+    Block device implementations with Copy-on-Write support and IndexedDB persistence.
+  </Card>
+  <Card title="@qemuweb/vm-config" icon="setting">
+    VM profiles, networking configuration, and container specifications.
+  </Card>
+  <Card title="@qemuweb/qemu-wasm" icon="laptop">
+    QEMU compiled to WebAssembly using Emscripten.
+  </Card>
+</CardGrid>
+
+## How It Works
+
+<div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
+  <img src="/qemuweb/diagrams/01-architecture-overview.svg" alt="Architecture Overview" style="width: 100%; height: auto;" />
+</div>
+
+### The Three-Layer Architecture
+
+1. **Main Thread (UI Layer)**
+   - React application with terminal UI (xterm.js)
+   - `QemuClient` API for VM control
+   - AI agent integration (LangGraph)
+
+2. **Web Worker (Execution Layer)**
+   - Runs QEMU WebAssembly in an isolated thread
+   - Handles VM lifecycle and I/O
+   - Communicates via `postMessage` protocol
+
+3. **Storage Layer (Persistence)**
+   - Block devices backed by IndexedDB
+   - Copy-on-Write overlays for efficient snapshots
+   - Content-addressed storage (Atlas Store)
+
+## Key Features
+
+### 🚀 Zero Installation
+No need to install Docker, VirtualBox, or any other software. If your browser supports WebAssembly and SharedArrayBuffer, you can run VMs.
+
+### 💾 Persistent Storage
+VMs maintain their state across browser sessions using IndexedDB. Changes are stored efficiently using Copy-on-Write, so you only store what's changed.
+
+### 🔒 Sandboxed Security
+Each VM runs in a completely isolated Web Worker. There's no access to your host filesystem, network, or other browser tabs.
+
+### 🤖 AI Integration
+Built-in support for AI agents via LangGraph and Model Context Protocol (MCP) servers. Let AI control your virtual infrastructure!
+
+### 🌐 Virtual Networking
+Configure complex network topologies with multiple VMs, routers, and firewall rules—all running in your browser.
+
+## Use Cases
+
+- **Education**: Learn Linux, networking, or system administration without affecting your real system
+- **Development**: Test infrastructure configurations in isolated environments
+- **Security Research**: Analyze malware or suspicious files safely
+- **AI Training**: Create controlled environments for training AI agents
+- **Demos**: Show live Linux environments in web applications
+
+## Browser Requirements
+
+<Aside type="caution">
+  QemuWeb requires specific browser features that need proper server configuration.
+</Aside>
+
+| Requirement | Details |
+|-------------|---------|
+| WebAssembly | Core technology for running QEMU |
+| SharedArrayBuffer | Required for multi-threaded WASM |
+| Cross-Origin Isolation | Headers: `COOP` and `COEP` |
+| IndexedDB | For persistent storage |
+
+See [Browser Requirements](/qemuweb/getting-started/requirements/) for detailed compatibility information.
+
+## Next Steps
+
+<CardGrid>
+  <Card title="Quick Start" icon="rocket">
+    Get your first VM running in minutes.
+    
+    [Start the tutorial →](/qemuweb/getting-started/quick-start/)
+  </Card>
+  <Card title="Architecture Deep Dive" icon="open-book">
+    Understand how all the pieces fit together.
+    
+    [Learn the architecture →](/qemuweb/architecture/overview/)
+  </Card>
+</CardGrid>

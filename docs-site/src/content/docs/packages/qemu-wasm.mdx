@@ -1,0 +1,254 @@
+---
+title: "@qemuweb/qemu-wasm"
+description: QEMU compiled to WebAssembly using Emscripten
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+The `@qemuweb/qemu-wasm` package contains QEMU compiled to WebAssembly, enabling x86_64 (and potentially other architectures) emulation directly in the browser.
+
+<Aside type="caution">
+  Building QEMU to WebAssembly requires Docker and can take 30+ minutes. Pre-built binaries are provided for convenience.
+</Aside>
+
+## Overview
+
+This package provides:
+
+- QEMU system emulator compiled to WebAssembly
+- JavaScript bindings for the WASM module
+- Build scripts and Docker configuration
+
+## Using Pre-built Binaries
+
+For most users, the pre-built binaries are sufficient:
+
+```typescript
+import { QemuClient } from '@qemuweb/runtime';
+
+const client = new QemuClient({
+  wasmUrl: '/qemu-system-x86_64.wasm',
+  workerUrl: '/worker.js',
+});
+```
+
+The WASM file should be served from your static assets.
+
+## Building from Source
+
+If you need to customize QEMU or build for a different architecture:
+
+<Steps>
+
+1. **Install Docker**
+
+   The build uses Docker to ensure a consistent environment.
+
+2. **Build the Docker image**
+
+   ```bash
+   cd packages/qemu-wasm
+   docker build -t qemu-wasm-builder .
+   ```
+
+3. **Run the build**
+
+   ```bash
+   docker run --rm -v $(pwd)/dist:/output qemu-wasm-builder
+   ```
+
+4. **Find the output**
+
+   Built files will be in `packages/qemu-wasm/dist/`:
+   - `qemu-system-x86_64.wasm` - Main WASM binary
+   - `qemu-system-x86_64.js` - JavaScript glue code
+
+</Steps>
+
+## Build Configuration
+
+### Dockerfile
+
+The build environment is defined in the Dockerfile:
+
+```dockerfile
+FROM emscripten/emsdk:3.1.50
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    ninja-build \
+    python3 \
+    pkg-config \
+    libglib2.0-dev
+
+# Copy QEMU source and patches
+COPY patches/ /build/patches/
+COPY scripts/ /build/scripts/
+
+# Run build
+WORKDIR /build
+RUN ./scripts/build.sh
+```
+
+### Build Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `build.sh` | Main build orchestration |
+| `config.sh` | Environment variables and paths |
+| `configure-qemu.sh` | QEMU configure options |
+| `compile-qemu.sh` | Emscripten compilation |
+
+### Configuration Options
+
+```bash
+# scripts/configure-qemu.sh
+./configure \
+  --target-list=x86_64-softmmu \
+  --cross-prefix=em \
+  --cpu=wasm32 \
+  --disable-system \
+  --enable-softmmu \
+  --disable-tools \
+  --disable-guest-agent \
+  --disable-vnc \
+  --disable-sdl \
+  --disable-gtk \
+  --disable-opengl \
+  --disable-virglrenderer \
+  --disable-xen \
+  --disable-kvm \
+  --enable-virtfs \
+  --audio-drv-list= \
+  --with-coroutine=fiber
+```
+
+## WASM Module API
+
+The compiled WASM module exposes these functions:
+
+```typescript
+interface QemuWasmModule {
+  // Lifecycle
+  _qemu_init(argc: number, argv: number): number;
+  _qemu_main_loop(): void;
+  _qemu_cleanup(): void;
+  
+  // Serial I/O
+  _qemu_serial_write(data: number, len: number): void;
+  _qemu_serial_read(): number;
+  
+  // Block I/O callbacks
+  _qemu_block_read_callback: (device: number, sector: number, buffer: number, count: number) => void;
+  _qemu_block_write_callback: (device: number, sector: number, buffer: number, count: number) => void;
+  
+  // Memory
+  HEAPU8: Uint8Array;
+  _malloc(size: number): number;
+  _free(ptr: number): void;
+}
+```
+
+### Initialization
+
+```typescript
+// Load the module
+const Module = await import('/qemu-system-x86_64.js');
+
+// Wait for initialization
+await new Promise((resolve) => {
+  Module.onRuntimeInitialized = resolve;
+});
+
+// Configure and start
+const args = [
+  'qemu-system-x86_64',
+  '-M', 'microvm',
+  '-m', '128',
+  '-nographic',
+  '-serial', 'mon:stdio',
+  '-kernel', '/vmlinuz',
+  '-append', 'console=ttyS0',
+];
+
+// Allocate argument strings
+const argc = args.length;
+const argv = Module._malloc(argc * 4);
+// ... copy strings to WASM memory ...
+
+Module._qemu_init(argc, argv);
+```
+
+## Memory Management
+
+The WASM module has a limited linear memory:
+
+```typescript
+// Default: 256MB, can be increased
+const INITIAL_MEMORY = 256 * 1024 * 1024;
+const MAXIMUM_MEMORY = 512 * 1024 * 1024;
+
+// Check available memory
+const heapSize = Module.HEAPU8.length;
+const heapUsed = Module._sbrk(0);
+```
+
+<Aside type="tip">
+  VM RAM allocation comes from WASM linear memory. A 128MB VM needs at least 256MB WASM memory.
+</Aside>
+
+## Patches
+
+Custom patches are applied to QEMU for browser compatibility:
+
+| Patch | Purpose |
+|-------|---------|
+| `01-emscripten-support.patch` | Core Emscripten compatibility |
+| `02-remove-signals.patch` | Disable POSIX signals (not available) |
+| `03-async-block-io.patch` | Async block device callbacks |
+| `04-virtio-serial.patch` | Serial console via virtio |
+
+## Supported Features
+
+### Enabled
+
+- x86_64 system emulation
+- virtio-blk (block devices)
+- virtio-serial (console)
+- virtio-net (networking, planned)
+- MicroVM machine type (lightweight)
+
+### Disabled
+
+- KVM acceleration (requires kernel)
+- Graphics/VGA (SDL, GTK, OpenGL)
+- Audio devices
+- USB passthrough
+- PCI device assignment
+
+## Performance
+
+WASM execution is slower than native QEMU:
+
+| Metric | Native | WASM | Ratio |
+|--------|--------|------|-------|
+| Boot time | ~1s | ~5s | 5x |
+| CPU benchmarks | baseline | 10-20x slower | — |
+| I/O throughput | 100+ MB/s | ~10 MB/s | 10x |
+
+<Aside type="note">
+  Performance varies by browser. Chrome generally offers the best WASM performance.
+</Aside>
+
+## Future Improvements
+
+- **SIMD**: Use WASM SIMD for faster emulation
+- **Threads**: pthreads support for multi-core VMs
+- **aarch64**: ARM64 target support
+- **RISC-V**: RISC-V target support
+
+## Source Code
+
+- [packages/qemu-wasm/Dockerfile](https://github.com/user/qemuweb/blob/main/packages/qemu-wasm/Dockerfile)
+- [packages/qemu-wasm/scripts/](https://github.com/user/qemuweb/blob/main/packages/qemu-wasm/scripts/)
+- [packages/qemu-wasm/patches/](https://github.com/user/qemuweb/blob/main/packages/qemu-wasm/patches/)

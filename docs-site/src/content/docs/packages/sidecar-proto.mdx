@@ -1,0 +1,303 @@
+---
+title: "@qemuweb/sidecar-proto"
+description: Communication protocol for external sidecar services
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The `@qemuweb/sidecar-proto` package provides a transport layer for communicating with external sidecar services. This enables features like network bridging, file system access, and integration with native tools.
+
+## Installation
+
+```bash
+pnpm add @qemuweb/sidecar-proto
+```
+
+## Overview
+
+The sidecar pattern allows BrowserQEMU to communicate with a native process running alongside the browser. This enables features that aren't possible in pure browser environments:
+
+- Network bridging to host network
+- File system access
+- Hardware device passthrough
+- Native tool integration
+
+## Exports
+
+```typescript
+import {
+  // Transport implementations
+  LocalTransport,
+  RemoteTransport,
+  MockSidecar,
+  
+  // Types
+  type Transport,
+  type SidecarMessage,
+  type SidecarResponse,
+} from '@qemuweb/sidecar-proto';
+```
+
+## Transport Interface
+
+All transports implement a common interface:
+
+```typescript
+interface Transport {
+  /** Connect to the sidecar */
+  connect(): Promise<void>;
+  
+  /** Disconnect from the sidecar */
+  disconnect(): Promise<void>;
+  
+  /** Send a message and wait for response */
+  send(message: SidecarMessage): Promise<SidecarResponse>;
+  
+  /** Check if connected */
+  isConnected(): boolean;
+  
+  /** Listen for events */
+  on(event: 'message' | 'error' | 'disconnect', handler: Function): void;
+}
+```
+
+## Transport Implementations
+
+### LocalTransport
+
+Communicates with a sidecar running on localhost via WebSocket:
+
+```typescript
+import { LocalTransport } from '@qemuweb/sidecar-proto';
+
+const transport = new LocalTransport({
+  host: 'localhost',
+  port: 9876,
+});
+
+await transport.connect();
+
+const response = await transport.send({
+  type: 'ping',
+});
+
+console.log(response); // { type: 'pong' }
+```
+
+#### Configuration
+
+```typescript
+interface LocalTransportConfig {
+  host: string;        // Default: 'localhost'
+  port: number;        // Default: 9876
+  secure?: boolean;    // Use wss:// (default: false)
+  timeout?: number;    // Connection timeout in ms
+}
+```
+
+### RemoteTransport
+
+Communicates with a remote sidecar service:
+
+```typescript
+import { RemoteTransport } from '@qemuweb/sidecar-proto';
+
+const transport = new RemoteTransport({
+  url: 'wss://sidecar.example.com',
+  authToken: 'secret-token',
+});
+
+await transport.connect();
+```
+
+#### Configuration
+
+```typescript
+interface RemoteTransportConfig {
+  url: string;         // WebSocket URL
+  authToken?: string;  // Authentication token
+  headers?: Record<string, string>;
+}
+```
+
+### MockSidecar
+
+For testing without a real sidecar:
+
+```typescript
+import { MockSidecar } from '@qemuweb/sidecar-proto';
+
+const mock = new MockSidecar();
+
+// Register handlers
+mock.on('ping', () => ({ type: 'pong' }));
+
+mock.on('readFile', (msg) => ({
+  type: 'fileContent',
+  data: new Uint8Array([1, 2, 3]),
+}));
+
+// Use as transport
+const transport = mock.asTransport();
+await transport.connect();
+```
+
+## Message Types
+
+### SidecarMessage
+
+```typescript
+interface SidecarMessage {
+  type: string;
+  id?: string;         // Request ID for correlation
+  payload?: unknown;   // Message-specific data
+}
+```
+
+### Common Message Types
+
+```typescript
+// File system
+{ type: 'readFile', path: '/etc/hosts' }
+{ type: 'writeFile', path: '/tmp/data', data: Uint8Array }
+{ type: 'listDir', path: '/home' }
+
+// Network
+{ type: 'tcpConnect', host: 'example.com', port: 80 }
+{ type: 'tcpSend', connectionId: 'abc', data: Uint8Array }
+{ type: 'tcpClose', connectionId: 'abc' }
+
+// System
+{ type: 'ping' }
+{ type: 'getInfo' }
+{ type: 'exec', command: 'ls', args: ['-la'] }
+```
+
+### SidecarResponse
+
+```typescript
+interface SidecarResponse {
+  type: string;
+  id?: string;         // Matches request ID
+  success: boolean;
+  error?: string;
+  data?: unknown;
+}
+```
+
+## Usage Examples
+
+### File Access
+
+```typescript
+import { LocalTransport } from '@qemuweb/sidecar-proto';
+
+const transport = new LocalTransport({ port: 9876 });
+await transport.connect();
+
+// Read a file
+const response = await transport.send({
+  type: 'readFile',
+  path: '/etc/hosts',
+});
+
+if (response.success) {
+  console.log(new TextDecoder().decode(response.data));
+}
+```
+
+### Network Bridging
+
+```typescript
+// Bridge VM network to host
+const response = await transport.send({
+  type: 'bridgeNetwork',
+  vmNetwork: 'management',
+  hostInterface: 'en0',
+});
+
+if (response.success) {
+  console.log('Network bridged successfully');
+}
+```
+
+### Command Execution
+
+```typescript
+// Execute a command on host
+const response = await transport.send({
+  type: 'exec',
+  command: 'docker',
+  args: ['ps', '-a'],
+});
+
+console.log(response.stdout);
+```
+
+## Event Handling
+
+```typescript
+transport.on('message', (msg) => {
+  console.log('Received:', msg);
+});
+
+transport.on('error', (err) => {
+  console.error('Transport error:', err);
+});
+
+transport.on('disconnect', () => {
+  console.log('Sidecar disconnected');
+  // Attempt reconnection
+});
+```
+
+## Sidecar Server
+
+The sidecar server is a native application that runs alongside the browser:
+
+```typescript
+// Example Node.js sidecar server
+import { WebSocketServer } from 'ws';
+
+const wss = new WebSocketServer({ port: 9876 });
+
+wss.on('connection', (ws) => {
+  ws.on('message', async (data) => {
+    const msg = JSON.parse(data.toString());
+    
+    switch (msg.type) {
+      case 'ping':
+        ws.send(JSON.stringify({ type: 'pong', id: msg.id }));
+        break;
+        
+      case 'readFile':
+        const content = await fs.readFile(msg.path);
+        ws.send(JSON.stringify({
+          type: 'fileContent',
+          id: msg.id,
+          success: true,
+          data: content.toString('base64'),
+        }));
+        break;
+    }
+  });
+});
+```
+
+<Aside type="caution">
+  The sidecar server has access to your host system. Only run trusted sidecar implementations.
+</Aside>
+
+## Security Considerations
+
+1. **Authentication**: Always use authentication tokens for remote sidecars
+2. **TLS**: Use `wss://` for encrypted connections
+3. **Allowlists**: Restrict which operations the sidecar can perform
+4. **Sandboxing**: Run the sidecar with minimal privileges
+
+## Source Code
+
+- [packages/sidecar-proto/src/types.ts](https://github.com/user/qemuweb/blob/main/packages/sidecar-proto/src/types.ts)
+- [packages/sidecar-proto/src/localTransport.ts](https://github.com/user/qemuweb/blob/main/packages/sidecar-proto/src/localTransport.ts)
+- [packages/sidecar-proto/src/remoteTransport.ts](https://github.com/user/qemuweb/blob/main/packages/sidecar-proto/src/remoteTransport.ts)
+- [packages/sidecar-proto/src/mockSidecar.ts](https://github.com/user/qemuweb/blob/main/packages/sidecar-proto/src/mockSidecar.ts)

@@ -1,0 +1,344 @@
+---
+title: Virtual Networking
+description: Software-defined networking for multi-VM topologies in the browser
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+QemuWeb's virtual networking system enables complex network topologies with multiple VMs, routers, switches, and firewall rules—all running entirely in your browser.
+
+<Aside type="note">
+  Virtual networking is currently in development. This page describes the planned architecture.
+</Aside>
+
+## Network Architecture
+
+<div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
+  <img src="/qemuweb/diagrams/04-virtual-networking.svg" alt="Virtual Networking" style="width: 100%; height: auto;" />
+</div>
+
+## Key Concepts
+
+### Network Types
+
+<CardGrid>
+  <Card title="NAT Network" icon="external">
+    VMs share a single gateway with network address translation. Default for simple setups.
+  </Card>
+  <Card title="Internal Network" icon="seti:lock">
+    Isolated network with no external access. Perfect for security-sensitive workloads.
+  </Card>
+  <Card title="Routed Network" icon="right-arrow">
+    VMs have direct routes to other networks via a virtual router.
+  </Card>
+  <Card title="Bridged Network" icon="random">
+    Multiple networks connected via virtual switches.
+  </Card>
+</CardGrid>
+
+### Components
+
+| Component | Description |
+|-----------|-------------|
+| **Virtual NIC** | Network interface attached to a VM |
+| **Virtual Switch** | Layer 2 switch connecting multiple NICs |
+| **Virtual Router** | Layer 3 routing between networks |
+| **Firewall** | Packet filtering and security rules |
+| **DHCP Server** | Automatic IP assignment |
+| **DNS Server** | Name resolution within the virtual network |
+
+## Network Configuration
+
+### Defining Networks
+
+```typescript
+import { NetworkBuilder } from '@qemuweb/vm-config';
+
+const network = new NetworkBuilder()
+  .name('management')
+  .type('nat')
+  .cidr('10.0.0.0/24')
+  .gateway('10.0.0.1')
+  .dhcp({
+    start: '10.0.0.10',
+    end: '10.0.0.200',
+  })
+  .dns(['10.0.0.1'])
+  .build();
+```
+
+### Network Types in Detail
+
+#### NAT Network
+
+```typescript
+{
+  type: 'nat',
+  cidr: '10.0.0.0/24',
+  gateway: '10.0.0.1',  // NAT gateway
+  features: {
+    dhcp: true,
+    dns: true,
+    masquerade: true,   // Hide internal IPs
+  }
+}
+```
+
+#### Internal (Isolated) Network
+
+```typescript
+{
+  type: 'internal',
+  cidr: '192.168.100.0/24',
+  features: {
+    dhcp: true,
+    dns: false,         // No external DNS
+    isolated: true,     // No routing to other networks
+  }
+}
+```
+
+#### Routed Network
+
+```typescript
+{
+  type: 'routed',
+  cidr: '172.16.0.0/24',
+  routes: [
+    { destination: '10.0.0.0/24', gateway: '172.16.0.1' },
+    { destination: '0.0.0.0/0', gateway: '172.16.0.254' },
+  ]
+}
+```
+
+## VM Network Configuration
+
+### Attaching NICs
+
+```typescript
+import { VmBuilder } from '@qemuweb/vm-config';
+
+const vm = new VmBuilder()
+  .profile('alpineLinux')
+  .nic({
+    network: 'management',
+    mac: '52:54:00:12:34:56',  // Optional, auto-generated if omitted
+    ip: '10.0.0.10',          // Static IP, or use DHCP
+  })
+  .nic({
+    network: 'internal',
+    ip: '192.168.100.10',
+  })
+  .build();
+```
+
+### Multi-NIC Example
+
+```typescript
+// Web server with two interfaces
+const webServer = new VmBuilder()
+  .profile('alpineLinux')
+  .name('web-server')
+  .nic({ network: 'dmz', ip: '172.16.0.10' })        // Public facing
+  .nic({ network: 'internal', ip: '192.168.100.10' }) // Backend access
+  .build();
+
+// Database with internal-only access
+const database = new VmBuilder()
+  .profile('alpineLinux')
+  .name('database')
+  .nic({ network: 'internal', ip: '192.168.100.20' }) // Internal only
+  .build();
+```
+
+## Firewall Rules
+
+### Rule Definition
+
+```typescript
+interface FirewallRule {
+  id: string;
+  priority: number;        // Lower = higher priority
+  action: 'allow' | 'deny' | 'log';
+  
+  // Match criteria
+  source?: {
+    network?: string;
+    ip?: string;
+    port?: number | string;  // '80' or '80-443'
+  };
+  destination?: {
+    network?: string;
+    ip?: string;
+    port?: number | string;
+  };
+  protocol?: 'tcp' | 'udp' | 'icmp' | 'any';
+}
+```
+
+### Example Rules
+
+```typescript
+const firewallRules: FirewallRule[] = [
+  // Allow HTTP/HTTPS from DMZ to internal
+  {
+    id: 'allow-web-to-backend',
+    priority: 100,
+    action: 'allow',
+    source: { network: 'dmz' },
+    destination: { network: 'internal', port: '80,443' },
+    protocol: 'tcp',
+  },
+  
+  // Block all other DMZ to internal traffic
+  {
+    id: 'block-dmz-to-internal',
+    priority: 200,
+    action: 'deny',
+    source: { network: 'dmz' },
+    destination: { network: 'internal' },
+  },
+  
+  // Allow established connections back
+  {
+    id: 'allow-established',
+    priority: 50,
+    action: 'allow',
+    state: 'established',
+  },
+];
+```
+
+## Router Configuration
+
+### BusyBox Router Profile
+
+For routing between networks, use the built-in BusyBox router:
+
+```typescript
+import { profiles } from '@qemuweb/vm-config';
+
+const router = new VmBuilder()
+  .profile(profiles.busyboxRouter)
+  .name('core-router')
+  .nic({ network: 'management', ip: '10.0.0.254' })
+  .nic({ network: 'internal', ip: '192.168.100.1' })
+  .nic({ network: 'dmz', ip: '172.16.0.1' })
+  .routing({
+    forwarding: true,
+    nat: {
+      outbound: 'management',  // NAT internal traffic to management
+    },
+  })
+  .build();
+```
+
+### Static Routes
+
+```typescript
+const routerConfig = {
+  routes: [
+    { destination: '0.0.0.0/0', gateway: '10.0.0.1', interface: 'eth0' },
+    { destination: '192.168.100.0/24', interface: 'eth1' },
+    { destination: '172.16.0.0/24', interface: 'eth2' },
+  ],
+};
+```
+
+## Network Topology Example
+
+### Three-Tier Architecture
+
+```typescript
+import { TopologyBuilder } from '@qemuweb/vm-config';
+
+const topology = new TopologyBuilder()
+  // Define networks
+  .network({
+    name: 'management',
+    type: 'nat',
+    cidr: '10.0.0.0/24',
+  })
+  .network({
+    name: 'dmz',
+    type: 'routed',
+    cidr: '172.16.0.0/24',
+  })
+  .network({
+    name: 'backend',
+    type: 'internal',
+    cidr: '192.168.100.0/24',
+  })
+  
+  // Add router
+  .vm({
+    name: 'router',
+    profile: 'busyboxRouter',
+    nics: [
+      { network: 'management', ip: '10.0.0.254' },
+      { network: 'dmz', ip: '172.16.0.1' },
+      { network: 'backend', ip: '192.168.100.1' },
+    ],
+  })
+  
+  // Add web server in DMZ
+  .vm({
+    name: 'web',
+    profile: 'alpineLinux',
+    nics: [{ network: 'dmz', ip: '172.16.0.10' }],
+  })
+  
+  // Add API server (DMZ + backend)
+  .vm({
+    name: 'api',
+    profile: 'alpineLinux',
+    nics: [
+      { network: 'dmz', ip: '172.16.0.11' },
+      { network: 'backend', ip: '192.168.100.10' },
+    ],
+  })
+  
+  // Add database (backend only)
+  .vm({
+    name: 'db',
+    profile: 'alpineLinux',
+    nics: [{ network: 'backend', ip: '192.168.100.20' }],
+  })
+  
+  // Add firewall rules
+  .firewall([
+    { action: 'allow', source: { network: 'dmz' }, destination: { network: 'backend', port: '5432' } },
+    { action: 'deny', source: { network: 'dmz' }, destination: { network: 'backend' } },
+  ])
+  
+  .build();
+```
+
+## Implementation Status
+
+| Feature | Status |
+|---------|--------|
+| Single VM networking | ✅ Complete |
+| NAT gateway | 🔶 In Progress |
+| Multi-VM topology | 🔶 Planned |
+| Virtual switches | 🔶 Planned |
+| Firewall rules | 🔶 Planned |
+| DHCP server | 🔶 Planned |
+| DNS server | 🔶 Planned |
+
+## Technical Details
+
+### Packet Flow
+
+1. Guest OS writes packet to virtio-net device
+2. QEMU passes packet to virtual switch
+3. Switch forwards to destination NIC or router
+4. Router applies firewall rules
+5. If allowed, packet delivered to destination
+
+### Performance Considerations
+
+- All networking happens in JavaScript/WASM
+- No actual network sockets are used
+- Latency is minimal (in-memory packet passing)
+- Throughput limited by WASM execution speed

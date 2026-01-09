@@ -1,0 +1,319 @@
+---
+title: "@qemuweb/storage"
+description: Block device implementations with Copy-on-Write and IndexedDB persistence
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+The `@qemuweb/storage` package provides the storage layer for QemuWeb. It includes block device implementations, Copy-on-Write overlays, and the Atlas content-addressed store.
+
+## Installation
+
+```bash
+pnpm add @qemuweb/storage
+```
+
+## Exports
+
+```typescript
+import {
+  // Block device types
+  type BlockDevice,
+  type BlockDeviceConfig,
+  
+  // Implementations
+  HttpBlockDevice,
+  FileBlockDevice,
+  CowBlockDevice,
+  IndexedDbOverlay,
+  
+  // Atlas Store
+  AtlasStore,
+  
+  // Constants
+  BLOCK_SIZE,  // 65536 (64KB)
+} from '@qemuweb/storage';
+```
+
+## BlockDevice Interface
+
+All storage backends implement this interface:
+
+```typescript
+interface BlockDevice {
+  /** Block size in bytes (always 65536) */
+  readonly blockSize: number;
+  
+  /** Total number of blocks */
+  readonly totalBlocks: number;
+  
+  /** Read a block by index */
+  read(blockIndex: number): Promise<Uint8Array>;
+  
+  /** Write a block by index */
+  write(blockIndex: number, data: Uint8Array): Promise<void>;
+  
+  /** Flush pending writes to backing store */
+  sync(): Promise<void>;
+  
+  /** Clean up resources */
+  close(): Promise<void>;
+}
+```
+
+## Block Device Implementations
+
+<CardGrid>
+  <Card title="HttpBlockDevice" icon="external">
+    Fetches blocks from a remote URL using HTTP range requests.
+  </Card>
+  <Card title="FileBlockDevice" icon="document">
+    Reads blocks from a browser File object.
+  </Card>
+  <Card title="CowBlockDevice" icon="seti:todo">
+    Wraps a base device with Copy-on-Write semantics.
+  </Card>
+  <Card title="IndexedDbOverlay" icon="seti:db">
+    Stores modified blocks in IndexedDB.
+  </Card>
+</CardGrid>
+
+### HttpBlockDevice
+
+Fetches blocks from a remote server using HTTP range requests:
+
+```typescript
+import { HttpBlockDevice } from '@qemuweb/storage';
+
+const device = new HttpBlockDevice({
+  url: 'https://cdn.example.com/alpine-rootfs.bin',
+  totalSize: 134217728,  // 128MB
+});
+
+// Read block 42
+const data = await device.read(42);
+```
+
+<Aside type="note">
+  The server must support HTTP range requests (`Accept-Ranges: bytes`).
+</Aside>
+
+#### Configuration
+
+```typescript
+interface HttpBlockDeviceConfig {
+  url: string;              // URL to the disk image
+  totalSize: number;        // Total size in bytes
+  cacheSize?: number;       // Number of blocks to cache (default: 64)
+  fetchTimeout?: number;    // Request timeout in ms (default: 30000)
+}
+```
+
+### FileBlockDevice
+
+Reads blocks from a local File object (user-uploaded file):
+
+```typescript
+import { FileBlockDevice } from '@qemuweb/storage';
+
+// From file input
+const input = document.querySelector('input[type="file"]');
+const file = input.files[0];
+
+const device = new FileBlockDevice(file);
+
+// Read block 0
+const bootSector = await device.read(0);
+```
+
+### CowBlockDevice
+
+Wraps a base device with Copy-on-Write semantics:
+
+```typescript
+import { CowBlockDevice, HttpBlockDevice, IndexedDbOverlay } from '@qemuweb/storage';
+
+// Base image (read-only)
+const base = new HttpBlockDevice({
+  url: '/images/alpine-rootfs.bin',
+  totalSize: 134217728,
+});
+
+// Overlay for writes
+const overlay = new IndexedDbOverlay('my-vm');
+await overlay.open();
+
+// COW device
+const device = new CowBlockDevice(base, overlay);
+
+// Reads go to overlay first, then base
+const data = await device.read(42);
+
+// Writes always go to overlay
+await device.write(42, new Uint8Array(65536));
+
+// Sync overlay to IndexedDB
+await device.sync();
+```
+
+### IndexedDbOverlay
+
+Stores modified blocks persistently in IndexedDB:
+
+```typescript
+import { IndexedDbOverlay } from '@qemuweb/storage';
+
+const overlay = new IndexedDbOverlay('my-vm-id');
+await overlay.open();
+
+// Write a block
+await overlay.write(42, new Uint8Array(65536));
+
+// Check if block exists in overlay
+const hasBlock = await overlay.has(42);
+
+// Read from overlay (returns null if not present)
+const data = await overlay.read(42);
+
+// List all modified blocks
+const dirtyBlocks = await overlay.listDirtyBlocks();
+
+// Sync to ensure durability
+await overlay.sync();
+
+// Clean up
+await overlay.close();
+```
+
+#### Database Schema
+
+```typescript
+// Database: 'qemuweb-overlays'
+// Object Store: 'blocks'
+
+interface OverlayBlock {
+  key: string;           // `${vmId}:${blockIndex}`
+  data: ArrayBuffer;     // 64KB block data
+  timestamp: number;     // Last modified time
+}
+```
+
+## Atlas Store
+
+Content-addressed storage with deduplication:
+
+```typescript
+import { AtlasStore } from '@qemuweb/storage';
+
+const store = new AtlasStore();
+await store.open();
+
+// Store a block (returns content ID)
+const cid = await store.putBlock(data);
+// cid = 'sha256:a1b2c3d4...'
+
+// Retrieve by content ID
+const data = await store.getBlock(cid);
+
+// Create a manifest for a VM
+await store.createManifest('my-vm', totalBlocks);
+
+// Update manifest entry
+await store.setManifestBlock('my-vm', blockIndex, cid);
+
+// Read via manifest
+const vmData = await store.readVmBlock('my-vm', blockIndex);
+```
+
+### Deduplication
+
+The Atlas Store automatically deduplicates identical blocks:
+
+```typescript
+const data1 = new Uint8Array(65536).fill(0x42);
+const data2 = new Uint8Array(65536).fill(0x42);
+
+const cid1 = await store.putBlock(data1);
+const cid2 = await store.putBlock(data2);
+
+// cid1 === cid2 (same content = same hash)
+// Block stored only once!
+```
+
+### Sparse File Support
+
+Zero blocks are not stored:
+
+```typescript
+const zeros = new Uint8Array(65536); // All zeros
+const cid = await store.putBlock(zeros);
+
+// cid is null - zero blocks are not stored
+// Reading returns a fresh zero-filled array
+```
+
+## Block Size
+
+All devices use a constant 64KB block size:
+
+```typescript
+import { BLOCK_SIZE } from '@qemuweb/storage';
+
+console.log(BLOCK_SIZE); // 65536
+
+// Calculate block count for a file
+const totalBlocks = Math.ceil(fileSize / BLOCK_SIZE);
+```
+
+## Usage with QEMU
+
+The storage layer integrates with QEMU's virtio-blk:
+
+```typescript
+import { CowBlockDevice, HttpBlockDevice, IndexedDbOverlay } from '@qemuweb/storage';
+
+// Set up storage
+const base = new HttpBlockDevice({
+  url: '/images/alpine.bin',
+  totalSize: 128 * 1024 * 1024,
+});
+
+const overlay = new IndexedDbOverlay('alpine-vm-1');
+await overlay.open();
+
+const disk = new CowBlockDevice(base, overlay);
+
+// Pass to VM configuration
+const vmConfig = {
+  profile: 'alpineLinux',
+  blockDevices: [disk],
+};
+```
+
+## Testing
+
+The package includes comprehensive tests:
+
+```bash
+cd packages/storage
+pnpm test
+```
+
+Test files:
+- `cowBlockDevice.test.ts` - COW behavior tests
+- `indexeddbOverlay.test.ts` - IndexedDB persistence tests
+- `atlasStore.test.ts` - Content-addressed storage tests
+- `fileBlockDevice.test.ts` - File reading tests
+
+## Performance Tips
+
+1. **Batch reads**: Read multiple blocks in parallel when possible
+2. **Prefetch**: Use `HttpBlockDevice` caching for sequential access
+3. **Sync sparingly**: `sync()` is expensive; batch writes first
+4. **Use Atlas Store**: For multiple VMs sharing base images
+
+## Source Code
+
+- [packages/storage/src/types.ts](https://github.com/user/qemuweb/blob/main/packages/storage/src/types.ts)
+- [packages/storage/src/cowBlockDevice.ts](https://github.com/user/qemuweb/blob/main/packages/storage/src/cowBlockDevice.ts)
+- [packages/storage/src/indexeddbOverlay.ts](https://github.com/user/qemuweb/blob/main/packages/storage/src/indexeddbOverlay.ts)

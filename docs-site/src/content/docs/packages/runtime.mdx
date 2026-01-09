@@ -1,0 +1,275 @@
+---
+title: "@qemuweb/runtime"
+description: Core runtime package for VM lifecycle management and worker communication
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+The `@qemuweb/runtime` package is the heart of QemuWeb. It provides the client-side API for controlling virtual machines and handles all communication with the Web Worker running QEMU.
+
+## Installation
+
+```bash
+pnpm add @qemuweb/runtime
+```
+
+## Overview
+
+The package exports three main components:
+
+| Export | Description |
+|--------|-------------|
+| `QemuClient` | High-level API for VM control from the main thread |
+| `createWorker` | Factory for creating the Web Worker runtime |
+| `Protocol types` | TypeScript types for worker communication |
+
+## QemuClient
+
+The `QemuClient` class provides an event-driven API for controlling VMs:
+
+```typescript
+import { QemuClient } from '@qemuweb/runtime';
+
+const client = new QemuClient({
+  workerUrl: '/worker.js',
+  wasmUrl: '/qemu-system-x86_64.wasm',
+});
+```
+
+### Constructor Options
+
+```typescript
+interface ClientConfig {
+  workerUrl: string;          // URL to the worker script
+  wasmUrl: string;            // URL to QEMU WASM binary
+  wasmMemoryMB?: number;      // WASM memory limit (default: 256)
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+}
+```
+
+### Methods
+
+#### `start(profile: VmProfile): Promise<void>`
+
+Starts a VM with the specified profile:
+
+```typescript
+import { profiles } from '@qemuweb/vm-config';
+
+await client.start(profiles.alpineLinux);
+// VM is now running
+```
+
+#### `stop(): Promise<void>`
+
+Gracefully stops the running VM:
+
+```typescript
+await client.stop();
+// VM has stopped
+```
+
+#### `sendSerial(data: string): void`
+
+Sends data to the VM's serial console:
+
+```typescript
+client.sendSerial('ls -la\n');
+client.sendSerial('\x03'); // Ctrl+C
+```
+
+#### `syncOverlay(): Promise<void>`
+
+Forces a sync of the COW overlay to IndexedDB:
+
+```typescript
+await client.syncOverlay();
+// All pending writes are now durable
+```
+
+### Events
+
+The client emits events for all VM state changes:
+
+```typescript
+// Browser capability check (first event after worker loads)
+client.on('capabilities', (caps: BrowserCapabilities) => {
+  console.log('SharedArrayBuffer:', caps.sharedArrayBuffer);
+});
+
+// VM has started
+client.on('vmStarted', () => {
+  console.log('VM is running');
+});
+
+// VM has stopped
+client.on('vmStopped', (event: { reason: string }) => {
+  console.log('VM stopped:', event.reason);
+});
+
+// Serial console output
+client.on('serial', (data: string) => {
+  terminal.write(data);
+});
+
+// Progress updates during startup
+client.on('progress', (event: { stage: string; percent: number }) => {
+  console.log(`${event.stage}: ${event.percent}%`);
+});
+
+// Error occurred
+client.on('error', (error: { code: string; message: string }) => {
+  console.error('Error:', error.message);
+});
+
+// Debug logging
+client.on('log', (event: { level: string; message: string }) => {
+  console.log(`[${event.level}] ${event.message}`);
+});
+```
+
+## Worker Runtime
+
+The worker side is set up using `createWorker`:
+
+```typescript
+// worker.ts
+import { createWorker } from '@qemuweb/runtime';
+
+const worker = createWorker({
+  wasmUrl: self.location.origin + '/qemu-system-x86_64.wasm',
+});
+
+// Worker is now ready to receive commands
+```
+
+### Worker Configuration
+
+```typescript
+interface WorkerConfig {
+  wasmUrl: string;              // QEMU WASM binary URL
+  storageBackend?: 'indexeddb' | 'memory';
+  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+}
+```
+
+## Protocol Types
+
+The protocol types define the message format between client and worker:
+
+```typescript
+import type { 
+  WorkerCommand, 
+  WorkerEvent, 
+  BrowserCapabilities,
+  VmConfig 
+} from '@qemuweb/runtime';
+```
+
+### BrowserCapabilities
+
+```typescript
+interface BrowserCapabilities {
+  sharedArrayBuffer: boolean;
+  crossOriginIsolated: boolean;
+  atomics: boolean;
+  indexedDB: boolean;
+  webgl: boolean;
+  simd: boolean;
+  storageEstimate: {
+    quota: number;
+    usage: number;
+  };
+}
+```
+
+## Usage Examples
+
+### Basic VM Control
+
+```typescript
+import { QemuClient } from '@qemuweb/runtime';
+import { profiles } from '@qemuweb/vm-config';
+
+async function runVM() {
+  const client = new QemuClient({
+    workerUrl: '/worker.js',
+    wasmUrl: '/qemu-system-x86_64.wasm',
+  });
+
+  // Wait for capabilities
+  const caps = await new Promise((resolve) => {
+    client.on('capabilities', resolve);
+  });
+
+  if (!caps.sharedArrayBuffer) {
+    throw new Error('SharedArrayBuffer not available');
+  }
+
+  // Start VM
+  await client.start(profiles.alpineLinux);
+  console.log('VM started!');
+
+  // Send a command
+  client.sendSerial('uname -a\n');
+
+  // Listen for output
+  client.on('serial', (data) => {
+    process.stdout.write(data);
+  });
+}
+```
+
+### With React Hook
+
+```typescript
+import { useState, useEffect, useCallback } from 'react';
+import { QemuClient } from '@qemuweb/runtime';
+import type { BrowserCapabilities } from '@qemuweb/runtime';
+
+function useQemuClient(config: ClientConfig) {
+  const [client] = useState(() => new QemuClient(config));
+  const [capabilities, setCapabilities] = useState<BrowserCapabilities | null>(null);
+  const [status, setStatus] = useState<'idle' | 'starting' | 'running' | 'stopped'>('idle');
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    client.on('capabilities', setCapabilities);
+    client.on('vmStarted', () => setStatus('running'));
+    client.on('vmStopped', () => setStatus('stopped'));
+    client.on('error', (e) => setError(new Error(e.message)));
+
+    return () => {
+      client.stop();
+    };
+  }, [client]);
+
+  const start = useCallback(async (profile: VmProfile) => {
+    setStatus('starting');
+    setError(null);
+    await client.start(profile);
+  }, [client]);
+
+  const stop = useCallback(async () => {
+    await client.stop();
+  }, [client]);
+
+  return { client, capabilities, status, error, start, stop };
+}
+```
+
+## Dependencies
+
+The runtime package depends on:
+
+- `@qemuweb/storage` - Block device implementations
+- `@qemuweb/vm-config` - VM profiles and configuration
+- `@qemuweb/qemu-wasm` - QEMU WebAssembly binary
+
+## Source Code
+
+The full source is available at:
+
+- [packages/runtime/src/client.ts](https://github.com/user/qemuweb/blob/main/packages/runtime/src/client.ts)
+- [packages/runtime/src/worker.ts](https://github.com/user/qemuweb/blob/main/packages/runtime/src/worker.ts)
+- [packages/runtime/src/protocol.ts](https://github.com/user/qemuweb/blob/main/packages/runtime/src/protocol.ts)

@@ -1,0 +1,105 @@
+---
+title: QemuWeb
+description: Run virtual machines entirely in your browser using WebAssembly
+template: splash
+hero:
+  tagline: Run full virtual machines entirely in your browser. No downloads. No installations. Zero configuration. Pure WebAssembly.
+  image:
+    file: ../../assets/logo-dark.svg
+  actions:
+    - text: Get Started
+      link: /qemuweb/getting-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/user/qemuweb
+      icon: external
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<div style="margin-top: 4rem;"></div>
+
+## Why QemuWeb?
+
+<CardGrid stagger>
+  <Card title="Zero Installation" icon="rocket">
+    Run complete Linux VMs directly in your browser. No Docker, no VirtualBox, no admin rights needed. Works on any modern browser.
+  </Card>
+  <Card title="WebAssembly Powered" icon="laptop">
+    QEMU compiled to WebAssembly for near-native performance. Leverages SharedArrayBuffer and multi-threading for optimal speed.
+  </Card>
+  <Card title="Persistent Storage" icon="document">
+    Copy-on-Write block devices with IndexedDB backing. Your VM state survives browser refreshes and sessions.
+  </Card>
+  <Card title="AI-Driven Infrastructure" icon="star">
+    Built-in LangGraph agent with MCP servers for AI-controlled virtual environments and autonomous operations.
+  </Card>
+</CardGrid>
+
+---
+
+## Quick Example
+
+```typescript
+import { QemuClient } from '@qemuweb/runtime';
+import { profiles } from '@qemuweb/vm-config';
+
+// Create a VM client
+const client = new QemuClient({
+  workerUrl: '/worker.js',
+  wasmUrl: '/qemu-system-x86_64.wasm',
+});
+
+// Start an Alpine Linux VM
+await client.start(profiles.alpineLinux);
+
+// Send commands to the VM
+client.sendSerial('echo "Hello from the browser!"\n');
+
+// Handle VM output
+client.on('serial', (data) => {
+  console.log('VM output:', data);
+});
+```
+
+---
+
+## Architecture
+
+<div style="background: #0a0a0a; border: 1px solid #222; border-radius: 0.75rem; padding: 1.5rem; margin: 2rem 0;">
+  <img src="/qemuweb/diagrams/01-architecture-overview.svg" alt="Architecture Overview" style="width: 100%; height: auto; border: none; box-shadow: none;" />
+</div>
+
+---
+
+## Project Status
+
+| Component | Status |
+|-----------|--------|
+| QEMU WebAssembly Build | ✅ Complete |
+| Worker Protocol | ✅ Complete |
+| COW Block Devices | ✅ Complete |
+| IndexedDB Persistence | ✅ Complete |
+| VM Profiles | ✅ Complete |
+| Virtual Networking | 🔶 Planned |
+| AI Agent Integration | 🔶 In Progress |
+| Multi-VM Support | 🔶 Planned |
+
+---
+
+## Get Started
+
+<CardGrid>
+  <Card title="Introduction" icon="open-book">
+    Learn the core concepts and how QemuWeb works under the hood.
+    
+    [Read the introduction →](/qemuweb/getting-started/introduction/)
+  </Card>
+  <Card title="Quick Start" icon="laptop">
+    Get your first VM running in under 5 minutes.
+    
+    [Start building →](/qemuweb/getting-started/quick-start/)
+  </Card>
+</CardGrid>

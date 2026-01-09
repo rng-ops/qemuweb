@@ -1,0 +1,323 @@
+---
+title: LangGraph Agent
+description: AI-powered infrastructure control using LangGraph and LLMs
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+QemuWeb includes a LangGraph-based AI agent that can control virtual infrastructure using natural language commands. This page explains how the agent works and how to use it.
+
+## Overview
+
+<div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
+  <img src="/qemuweb/diagrams/06-ai-mcp-integration.svg" alt="AI Integration" style="width: 100%; height: auto;" />
+</div>
+
+The AI integration consists of:
+
+1. **LangGraph Agent**: Orchestrates tool calls and maintains state
+2. **MCP Servers**: Provide tools for VM and network control
+3. **LLM Backend**: Ollama, OpenAI, or other compatible providers
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     User Request                         │
+│              "Set up a web server with a database"       │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│                    LangGraph Agent                       │
+│  ┌─────────────────────────────────────────────────────┐│
+│  │ State Machine                                        ││
+│  │  • Parse request                                     ││
+│  │  • Plan tool calls                                   ││
+│  │  • Execute tools                                     ││
+│  │  • Handle results                                    ││
+│  └─────────────────────────────────────────────────────┘│
+└────────────────────────┬────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        ▼                ▼                ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│  vm-control  │ │sdn-control   │ │  firewall    │
+│  MCP Server  │ │MCP Server    │ │  MCP Server  │
+└──────────────┘ └──────────────┘ └──────────────┘
+```
+
+## Setup
+
+### Install Dependencies
+
+```bash
+pnpm add @langchain/langgraph @langchain/core @langchain/ollama
+```
+
+### Configure LLM Provider
+
+<Aside type="tip">
+  Ollama is recommended for local development as it runs entirely offline.
+</Aside>
+
+```typescript
+import { ChatOllama } from '@langchain/ollama';
+
+const llm = new ChatOllama({
+  model: 'llama3.1',
+  baseUrl: 'http://localhost:11434',
+});
+```
+
+### Initialize Agent
+
+```typescript
+import { createAgent } from '@qemuweb/agent';
+import { vmControlServer, sdnControlServer, firewallServer } from '@qemuweb/mcp-servers';
+
+const agent = createAgent({
+  llm,
+  mcpServers: [
+    vmControlServer,
+    sdnControlServer,
+    firewallServer,
+  ],
+});
+```
+
+## Using the Agent
+
+### Simple Commands
+
+```typescript
+// Natural language command
+const result = await agent.invoke({
+  input: "Start an Alpine Linux VM",
+});
+
+console.log(result.output);
+// "I've started an Alpine Linux VM. It's now running and accessible via the serial console."
+```
+
+### Complex Scenarios
+
+```typescript
+const result = await agent.invoke({
+  input: `
+    Create a secure web application environment:
+    1. Set up a DMZ network and an internal network
+    2. Deploy a web server in the DMZ
+    3. Deploy a database in the internal network
+    4. Configure firewall rules so the web server can access the database on port 5432
+    5. Block all other DMZ to internal traffic
+  `,
+});
+```
+
+### Streaming Responses
+
+```typescript
+const stream = agent.stream({
+  input: "Set up a three-tier architecture",
+});
+
+for await (const event of stream) {
+  if (event.type === 'tool_call') {
+    console.log(`Calling tool: ${event.tool}`);
+  } else if (event.type === 'message') {
+    console.log(event.content);
+  }
+}
+```
+
+## Agent State
+
+The LangGraph agent maintains state across interactions:
+
+```typescript
+interface AgentState {
+  // Conversation history
+  messages: Message[];
+  
+  // Current VM inventory
+  vms: VmInfo[];
+  
+  // Network topology
+  networks: NetworkInfo[];
+  
+  // Pending operations
+  pendingTasks: Task[];
+}
+```
+
+### State Persistence
+
+```typescript
+// Save state
+const checkpoint = await agent.getState();
+localStorage.setItem('agent-state', JSON.stringify(checkpoint));
+
+// Restore state
+const savedState = JSON.parse(localStorage.getItem('agent-state'));
+await agent.setState(savedState);
+```
+
+## Available Tools
+
+The agent has access to tools from MCP servers:
+
+### VM Control
+
+| Tool | Description |
+|------|-------------|
+| `start_vm` | Start a new VM with specified profile |
+| `stop_vm` | Stop a running VM |
+| `list_vms` | List all VMs and their status |
+| `execute_command` | Run a command in a VM |
+| `get_vm_logs` | Retrieve VM console logs |
+
+### Network Control
+
+| Tool | Description |
+|------|-------------|
+| `create_network` | Create a virtual network |
+| `delete_network` | Remove a network |
+| `add_vm_to_network` | Connect a VM to a network |
+| `remove_vm_from_network` | Disconnect a VM |
+| `get_topology` | Get current network topology |
+
+### Firewall
+
+| Tool | Description |
+|------|-------------|
+| `add_rule` | Add a firewall rule |
+| `remove_rule` | Remove a firewall rule |
+| `list_rules` | List all firewall rules |
+| `block_port` | Block a specific port |
+| `allow_port` | Allow a specific port |
+
+## Example Workflows
+
+### Lab Environment Setup
+
+```typescript
+const result = await agent.invoke({
+  input: `
+    Set up a Kubernetes learning lab:
+    - Create a management network
+    - Deploy 3 VMs: 1 control plane, 2 workers
+    - Configure networking so all nodes can communicate
+    - Install k3s on all nodes
+  `,
+});
+```
+
+### Security Testing
+
+```typescript
+const result = await agent.invoke({
+  input: `
+    Create an isolated network for malware analysis:
+    - Set up an internal network with no external access
+    - Deploy a Windows VM (when available) as the target
+    - Deploy a Linux VM with analysis tools
+    - Ensure the target cannot reach the internet
+  `,
+});
+```
+
+### Development Environment
+
+```typescript
+const result = await agent.invoke({
+  input: `
+    Set up a microservices development environment:
+    - Create separate networks for frontend, backend, and database tiers
+    - Deploy a Node.js VM for the API
+    - Deploy a PostgreSQL VM for the database
+    - Deploy an Nginx VM as reverse proxy
+    - Configure appropriate routing between tiers
+  `,
+});
+```
+
+## Custom Tools
+
+You can add custom tools to the agent:
+
+```typescript
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
+
+const customTool = tool(
+  async ({ url }) => {
+    const response = await fetch(url);
+    return await response.text();
+  },
+  {
+    name: 'fetch_url',
+    description: 'Fetch content from a URL',
+    schema: z.object({
+      url: z.string().describe('The URL to fetch'),
+    }),
+  }
+);
+
+const agent = createAgent({
+  llm,
+  mcpServers: [vmControlServer],
+  additionalTools: [customTool],
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+  const result = await agent.invoke({
+    input: "Start 100 VMs",
+  });
+} catch (error) {
+  if (error.code === 'RESOURCE_LIMIT') {
+    console.error('Too many VMs requested');
+  } else if (error.code === 'TOOL_FAILED') {
+    console.error('Tool execution failed:', error.toolName);
+  }
+}
+```
+
+## Debugging
+
+Enable debug logging to see agent reasoning:
+
+```typescript
+const agent = createAgent({
+  llm,
+  mcpServers: [...],
+  debug: true,
+  onStep: (step) => {
+    console.log('Step:', step.type);
+    console.log('Reasoning:', step.reasoning);
+    console.log('Action:', step.action);
+  },
+});
+```
+
+## Limitations
+
+<Aside type="note">
+  The AI agent is currently in development. Some features may be incomplete.
+</Aside>
+
+Current limitations:
+
+- Single conversation context (no multi-user support)
+- Limited to text-based interactions
+- Tool execution is sequential
+- No persistent memory across sessions (by default)
+
+## Next Steps
+
+- [MCP Servers](/qemuweb/ai/mcp-servers/) - Learn about the Model Context Protocol servers
+- [API Reference](/qemuweb/api/qemu-client/) - Direct API access

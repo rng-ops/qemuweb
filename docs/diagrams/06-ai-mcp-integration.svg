@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" width="900" height="700">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#EC4899;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DB2777;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="900" height="700" fill="#1F2937"/>
+  
+  <!-- Title -->
+  <rect x="0" y="0" width="900" height="50" fill="url(#headerGrad)"/>
+  <text x="450" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">AI Agent Integration &amp; MCP Servers</text>
+  
+  <!-- User/LLM Section -->
+  <rect x="30" y="70" width="200" height="100" rx="10" fill="#7C3AED" filter="url(#shadow)"/>
+  <text x="130" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">🤖 LLM / User</text>
+  <text x="130" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#DDD6FE">Ollama / OpenAI / Claude</text>
+  <text x="130" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#C4B5FD">Natural language commands</text>
+  
+  <!-- Arrow to LangGraph -->
+  <path d="M230 120 L280 120" stroke="#A78BFA" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#A78BFA"/>
+    </marker>
+  </defs>
+  
+  <!-- LangGraph Agent -->
+  <rect x="290" y="70" width="300" height="100" rx="10" fill="#1E3A5F" filter="url(#shadow)"/>
+  <text x="440" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#60A5FA">LangGraph Agent</text>
+  <text x="440" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#93C5FD">@langchain/langgraph</text>
+  <text x="310" y="140" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">• State machine for tool orchestration</text>
+  <text x="310" y="155" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">• Binds MCP servers as tools</text>
+  
+  <!-- Arrow to MCP -->
+  <path d="M590 120 L640 120" stroke="#60A5FA" stroke-width="2" fill="none" marker-end="url(#arrowhead2)"/>
+  <defs>
+    <marker id="arrowhead2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#60A5FA"/>
+    </marker>
+  </defs>
+  
+  <!-- MCP Protocol Box -->
+  <rect x="650" y="70" width="220" height="100" rx="10" fill="#374151" filter="url(#shadow)"/>
+  <text x="760" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#F59E0B">MCP Protocol</text>
+  <text x="760" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#FCD34D">JSON-RPC over stdio/HTTP</text>
+  <text x="670" y="140" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">• tools/list, tools/call</text>
+  <text x="670" y="155" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">• resources, prompts</text>
+  
+  <!-- MCP Servers Section -->
+  <text x="450" y="205" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="white">MCP Server Ecosystem</text>
+  
+  <!-- VM Control Server -->
+  <rect x="30" y="230" width="200" height="160" rx="10" fill="#064E3B" filter="url(#shadow)"/>
+  <text x="130" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#34D399">🖥️ vm-control</text>
+  <text x="130" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#6EE7B7">VM Lifecycle Management</text>
+  <rect x="45" y="290" width="170" height="90" rx="5" fill="#1F2937"/>
+  <text x="55" y="310" font-family="monospace" font-size="8" fill="#9CA3AF">Tools:</text>
+  <text x="55" y="325" font-family="monospace" font-size="8" fill="#34D399">• start_vm(profile)</text>
+  <text x="55" y="340" font-family="monospace" font-size="8" fill="#34D399">• stop_vm()</text>
+  <text x="55" y="355" font-family="monospace" font-size="8" fill="#34D399">• get_vm_status()</text>
+  <text x="55" y="370" font-family="monospace" font-size="8" fill="#34D399">• execute_command(cmd)</text>
+  
+  <!-- SDN Control Plane -->
+  <rect x="250" y="230" width="200" height="160" rx="10" fill="#1E1B4B" filter="url(#shadow)"/>
+  <text x="350" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#A78BFA">🌐 sdn-control-plane</text>
+  <text x="350" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#C4B5FD">Network Topology Control</text>
+  <rect x="265" y="290" width="170" height="90" rx="5" fill="#1F2937"/>
+  <text x="275" y="310" font-family="monospace" font-size="8" fill="#9CA3AF">Tools:</text>
+  <text x="275" y="325" font-family="monospace" font-size="8" fill="#A78BFA">• create_network(config)</text>
+  <text x="275" y="340" font-family="monospace" font-size="8" fill="#A78BFA">• add_vm_to_network()</text>
+  <text x="275" y="355" font-family="monospace" font-size="8" fill="#A78BFA">• create_route()</text>
+  <text x="275" y="370" font-family="monospace" font-size="8" fill="#A78BFA">• get_topology()</text>
+  
+  <!-- Firewall Server -->
+  <rect x="470" y="230" width="200" height="160" rx="10" fill="#7F1D1D" filter="url(#shadow)"/>
+  <text x="570" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#EF4444">🔥 firewall</text>
+  <text x="570" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#FCA5A5">Security Rules Engine</text>
+  <rect x="485" y="290" width="170" height="90" rx="5" fill="#1F2937"/>
+  <text x="495" y="310" font-family="monospace" font-size="8" fill="#9CA3AF">Tools:</text>
+  <text x="495" y="325" font-family="monospace" font-size="8" fill="#EF4444">• add_rule(src, dst, action)</text>
+  <text x="495" y="340" font-family="monospace" font-size="8" fill="#EF4444">• remove_rule(id)</text>
+  <text x="495" y="355" font-family="monospace" font-size="8" fill="#EF4444">• list_rules()</text>
+  <text x="495" y="370" font-family="monospace" font-size="8" fill="#EF4444">• block_port(port)</text>
+  
+  <!-- Observability Server -->
+  <rect x="690" y="230" width="180" height="160" rx="10" fill="#78350F" filter="url(#shadow)"/>
+  <text x="780" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#F59E0B">📊 observability</text>
+  <text x="780" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#FCD34D">Metrics &amp; Logs</text>
+  <rect x="705" y="290" width="150" height="90" rx="5" fill="#1F2937"/>
+  <text x="715" y="310" font-family="monospace" font-size="8" fill="#9CA3AF">Tools:</text>
+  <text x="715" y="325" font-family="monospace" font-size="8" fill="#F59E0B">• get_logs(filter)</text>
+  <text x="715" y="340" font-family="monospace" font-size="8" fill="#F59E0B">• get_metrics()</text>
+  <text x="715" y="355" font-family="monospace" font-size="8" fill="#F59E0B">• trace_network()</text>
+  <text x="715" y="370" font-family="monospace" font-size="8" fill="#F59E0B">• analyze_perf()</text>
+  
+  <!-- QemuWeb Runtime -->
+  <rect x="150" y="420" width="600" height="120" rx="10" fill="#1E3A5F" filter="url(#shadow)"/>
+  <text x="450" y="450" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#60A5FA">QemuWeb Runtime (Web Worker)</text>
+  
+  <rect x="170" y="465" width="150" height="55" rx="5" fill="#374151"/>
+  <text x="245" y="485" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">QEMU WASM</text>
+  <text x="245" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#9CA3AF">x86/ARM emulation</text>
+  
+  <rect x="340" y="465" width="150" height="55" rx="5" fill="#374151"/>
+  <text x="415" y="485" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Virtual Networks</text>
+  <text x="415" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#9CA3AF">Multi-VM topology</text>
+  
+  <rect x="510" y="465" width="150" height="55" rx="5" fill="#374151"/>
+  <text x="585" y="485" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Block Devices</text>
+  <text x="585" y="505" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#9CA3AF">COW + Atlas Store</text>
+  
+  <rect x="680" y="465" width="60" height="55" rx="5" fill="#374151"/>
+  <text x="710" y="495" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">...</text>
+  
+  <!-- Connection lines from MCP servers to Runtime -->
+  <line x1="130" y1="390" x2="250" y2="450" stroke="#34D399" stroke-width="2"/>
+  <line x1="350" y1="390" x2="400" y2="450" stroke="#A78BFA" stroke-width="2"/>
+  <line x1="570" y1="390" x2="500" y2="450" stroke="#EF4444" stroke-width="2"/>
+  <line x1="780" y1="390" x2="650" y2="450" stroke="#F59E0B" stroke-width="2"/>
+  
+  <!-- Example Flow -->
+  <rect x="30" y="560" width="840" height="120" rx="10" fill="#374151"/>
+  <text x="50" y="585" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#EC4899">Example: "Set up a web server isolated from the database"</text>
+  
+  <text x="50" y="610" font-family="Arial, sans-serif" font-size="10" fill="#D1D5DB">1. Agent receives natural language request</text>
+  <text x="50" y="627" font-family="Arial, sans-serif" font-size="10" fill="#34D399">2. Calls vm-control.start_vm("alpine") twice for web + db</text>
+  <text x="50" y="644" font-family="Arial, sans-serif" font-size="10" fill="#A78BFA">3. Calls sdn-control-plane.create_network("internal") + .create_network("dmz")</text>
+  <text x="50" y="661" font-family="Arial, sans-serif" font-size="10" fill="#EF4444">4. Calls firewall.add_rule(dmz → internal, deny) + firewall.add_rule(internal → dmz:80, allow)</text>
+</svg>

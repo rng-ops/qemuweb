@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" width="900" height="700">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6D28D9;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="900" height="700" fill="#1F2937"/>
+  
+  <!-- Title -->
+  <rect x="0" y="0" width="900" height="50" fill="url(#headerGrad)"/>
+  <text x="450" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">Virtual Networking (SDN) Architecture</text>
+  
+  <!-- Legend -->
+  <rect x="700" y="70" width="180" height="100" rx="8" fill="#374151"/>
+  <text x="790" y="92" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">Legend</text>
+  <rect x="715" y="105" width="20" height="15" fill="#3B82F6"/>
+  <text x="745" y="117" font-family="Arial, sans-serif" font-size="10" fill="#D1D5DB">VM Instance</text>
+  <rect x="715" y="125" width="20" height="15" fill="#10B981"/>
+  <text x="745" y="137" font-family="Arial, sans-serif" font-size="10" fill="#D1D5DB">Router</text>
+  <rect x="715" y="145" width="20" height="15" fill="#F59E0B"/>
+  <text x="745" y="157" font-family="Arial, sans-serif" font-size="10" fill="#D1D5DB">Switch</text>
+  
+  <!-- Management Network -->
+  <rect x="30" y="70" width="650" height="180" rx="10" fill="#1E3A5F" stroke="#3B82F6" stroke-width="2" filter="url(#shadow)"/>
+  <text x="50" y="95" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#60A5FA">Management Network (NAT)</text>
+  <text x="50" y="115" font-family="Arial, sans-serif" font-size="11" fill="#93C5FD">10.0.0.0/24 • Gateway: 10.0.0.1</text>
+  
+  <!-- Router in Management -->
+  <rect x="60" y="140" width="100" height="80" rx="8" fill="#10B981"/>
+  <text x="110" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">BusyBox</text>
+  <text x="110" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white">Router</text>
+  <text x="110" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#A7F3D0">10.0.0.1</text>
+  <text x="110" y="212" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#6EE7B7">NAT/DHCP/DNS</text>
+  
+  <!-- Switch -->
+  <rect x="200" y="155" width="80" height="50" rx="6" fill="#F59E0B"/>
+  <text x="240" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Switch</text>
+  
+  <!-- VMs in Management Network -->
+  <rect x="320" y="130" width="100" height="70" rx="8" fill="#3B82F6"/>
+  <text x="370" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Alpine VM 1</text>
+  <text x="370" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">10.0.0.10</text>
+  <text x="370" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#93C5FD">eth0</text>
+  
+  <rect x="440" y="130" width="100" height="70" rx="8" fill="#3B82F6"/>
+  <text x="490" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Vault</text>
+  <text x="490" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">10.0.0.11</text>
+  <text x="490" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#93C5FD">eth0</text>
+  
+  <rect x="560" y="130" width="100" height="70" rx="8" fill="#3B82F6"/>
+  <text x="610" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Agent VM</text>
+  <text x="610" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">10.0.0.12</text>
+  <text x="610" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#93C5FD">eth0</text>
+  
+  <!-- Connection lines to switch -->
+  <line x1="160" y1="180" x2="200" y2="180" stroke="#34D399" stroke-width="2"/>
+  <line x1="280" y1="180" x2="320" y2="165" stroke="#60A5FA" stroke-width="2"/>
+  <line x1="280" y1="180" x2="440" y2="165" stroke="#60A5FA" stroke-width="2"/>
+  <line x1="280" y1="180" x2="560" y2="165" stroke="#60A5FA" stroke-width="2"/>
+  
+  <!-- Internal Network -->
+  <rect x="30" y="270" width="420" height="180" rx="10" fill="#1C1917" stroke="#78350F" stroke-width="2" filter="url(#shadow)"/>
+  <text x="50" y="295" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#F59E0B">Internal Network (Isolated)</text>
+  <text x="50" y="315" font-family="Arial, sans-serif" font-size="11" fill="#FCD34D">192.168.100.0/24 • No external access</text>
+  
+  <!-- Switch in Internal -->
+  <rect x="60" y="340" width="80" height="50" rx="6" fill="#F59E0B"/>
+  <text x="100" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Switch</text>
+  
+  <!-- VMs in Internal Network -->
+  <rect x="180" y="330" width="100" height="70" rx="8" fill="#3B82F6"/>
+  <text x="230" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Database</text>
+  <text x="230" y="375" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">192.168.100.10</text>
+  <text x="230" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#93C5FD">eth0</text>
+  
+  <rect x="300" y="330" width="100" height="70" rx="8" fill="#3B82F6"/>
+  <text x="350" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Backend</text>
+  <text x="350" y="375" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">192.168.100.11</text>
+  <text x="350" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#93C5FD">eth0</text>
+  
+  <!-- Connection lines -->
+  <line x1="140" y1="365" x2="180" y2="365" stroke="#F59E0B" stroke-width="2"/>
+  <line x1="140" y1="365" x2="300" y2="365" stroke="#F59E0B" stroke-width="2"/>
+  
+  <!-- DMZ Network -->
+  <rect x="470" y="270" width="400" height="180" rx="10" fill="#1F1F1F" stroke="#DC2626" stroke-width="2" filter="url(#shadow)"/>
+  <text x="490" y="295" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#EF4444">DMZ Network (Routed)</text>
+  <text x="490" y="315" font-family="Arial, sans-serif" font-size="11" fill="#FCA5A5">172.16.0.0/24 • Public facing</text>
+  
+  <!-- Switch in DMZ -->
+  <rect x="500" y="340" width="80" height="50" rx="6" fill="#F59E0B"/>
+  <text x="540" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Switch</text>
+  
+  <!-- VMs in DMZ -->
+  <rect x="620" y="330" width="100" height="70" rx="8" fill="#3B82F6"/>
+  <text x="670" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">Web Server</text>
+  <text x="670" y="375" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">172.16.0.10</text>
+  <text x="670" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#93C5FD">eth0</text>
+  
+  <rect x="740" y="330" width="100" height="70" rx="8" fill="#3B82F6"/>
+  <text x="790" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">API Gateway</text>
+  <text x="790" y="375" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#BFDBFE">172.16.0.11</text>
+  <text x="790" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#93C5FD">eth0</text>
+  
+  <!-- Connection lines -->
+  <line x1="580" y1="365" x2="620" y2="365" stroke="#F59E0B" stroke-width="2"/>
+  <line x1="580" y1="365" x2="740" y2="365" stroke="#F59E0B" stroke-width="2"/>
+  
+  <!-- Inter-network routing -->
+  <text x="450" y="485" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">Network Interconnection</text>
+  
+  <!-- Router connecting networks -->
+  <rect x="360" y="510" width="180" height="80" rx="8" fill="#10B981" filter="url(#shadow)"/>
+  <text x="450" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Core Router</text>
+  <text x="450" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#A7F3D0">eth0: 10.0.0.254</text>
+  <text x="450" y="575" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#A7F3D0">eth1: 192.168.100.1 | eth2: 172.16.0.1</text>
+  
+  <!-- Connections from networks to router -->
+  <path d="M240 250 L240 510 L360 530" stroke="#60A5FA" stroke-width="2" fill="none" stroke-dasharray="5,3"/>
+  <path d="M230 405 L230 550 L360 550" stroke="#F59E0B" stroke-width="2" fill="none" stroke-dasharray="5,3"/>
+  <path d="M540 405 L540 570 L450 590" stroke="#EF4444" stroke-width="2" fill="none" stroke-dasharray="5,3"/>
+  
+  <!-- Firewall indicator -->
+  <rect x="60" y="610" width="780" height="70" rx="8" fill="#374151"/>
+  <text x="450" y="635" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#EF4444">🔥 Firewall Rules</text>
+  <text x="450" y="655" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#D1D5DB">Allow: Management → All | Internal ↔ DMZ (ports 80,443) | Block: DMZ → Internal (except established)</text>
+  <text x="450" y="670" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#9CA3AF">Configured via MCP sdn-control-plane and firewall servers</text>
+</svg>

@@ -1,0 +1,7 @@
+# Placeholder for QEMU patches
+# Add .patch files here to be applied during build
+
+# Example patches that may be needed:
+# - 0001-emscripten-stubs.patch - Stub out unsupported POSIX functions
+# - 0002-wasm-memory.patch - Adjust memory handling for Wasm
+# - 0003-disable-signals.patch - Disable signal handling (not supported in Wasm)

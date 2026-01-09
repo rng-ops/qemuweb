@@ -1,0 +1,337 @@
+---
+title: Development Setup
+description: Set up your development environment for contributing to QemuWeb
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This guide walks you through setting up a complete development environment for QemuWeb.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Node.js** | ≥18.0 | JavaScript runtime |
+| **pnpm** | ≥8.0 | Package manager |
+| **Docker** | ≥20.0 | Building QEMU WASM |
+| **Git** | ≥2.0 | Version control |
+
+<Aside type="tip">
+  We recommend using [Volta](https://volta.sh/) or [fnm](https://github.com/Schniz/fnm) to manage Node.js versions.
+</Aside>
+
+## Getting Started
+
+<Steps>
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/qemuweb/qemuweb.git
+   cd qemuweb
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   pnpm install
+   ```
+
+3. **Build all packages**
+
+   ```bash
+   pnpm build
+   ```
+
+4. **Start the development server**
+
+   ```bash
+   pnpm dev
+   ```
+
+5. **Open the app**
+
+   Navigate to [http://localhost:5173](http://localhost:5173)
+
+</Steps>
+
+## Project Structure
+
+```
+qemuweb/
+├── apps/
+│   └── web/              # Main web application (Vite + React)
+├── packages/
+│   ├── qemu-wasm/        # QEMU WebAssembly build
+│   ├── runtime/          # QEMU client and worker
+│   ├── storage/          # Block device implementations
+│   ├── vm-config/        # VM configuration system
+│   └── sidecar-proto/    # Sidecar communication protocol
+├── extensions/
+│   └── chrome/           # Chrome DevTools extension
+├── docs/                 # Documentation and diagrams
+└── docker/               # Docker configuration
+```
+
+## Development Workflow
+
+### Running Individual Packages
+
+<Tabs>
+  <TabItem label="Web App">
+```bash
+# Start dev server
+pnpm --filter @qemuweb/web dev
+
+# Build for production
+pnpm --filter @qemuweb/web build
+
+# Preview production build
+pnpm --filter @qemuweb/web preview
+```
+  </TabItem>
+  <TabItem label="Runtime">
+```bash
+# Build
+pnpm --filter @qemuweb/runtime build
+
+# Watch mode
+pnpm --filter @qemuweb/runtime dev
+
+# Run tests
+pnpm --filter @qemuweb/runtime test
+```
+  </TabItem>
+  <TabItem label="Storage">
+```bash
+# Build
+pnpm --filter @qemuweb/storage build
+
+# Run tests
+pnpm --filter @qemuweb/storage test
+
+# Run tests in watch mode
+pnpm --filter @qemuweb/storage test:watch
+```
+  </TabItem>
+</Tabs>
+
+### Building QEMU WASM
+
+Building QEMU for WebAssembly requires Docker:
+
+```bash
+cd packages/qemu-wasm
+
+# Build Docker image
+docker build -t qemu-wasm-builder .
+
+# Run build (outputs to dist/)
+docker run --rm -v $(pwd)/dist:/output qemu-wasm-builder
+```
+
+<Aside type="caution">
+  The QEMU WASM build takes 30-60 minutes and requires ~8GB RAM.
+</Aside>
+
+### Running Tests
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests for specific package
+pnpm --filter @qemuweb/storage test
+
+# Run tests with coverage
+pnpm test:coverage
+
+# Run E2E tests
+pnpm --filter @qemuweb/web test:e2e
+```
+
+### Linting and Formatting
+
+```bash
+# Lint all packages
+pnpm lint
+
+# Fix lint issues
+pnpm lint:fix
+
+# Format code
+pnpm format
+
+# Type check
+pnpm typecheck
+```
+
+## IDE Setup
+
+### VS Code
+
+We provide recommended extensions and settings. Open the project in VS Code and install the recommended extensions when prompted.
+
+**Recommended extensions:**
+- ESLint
+- Prettier
+- TypeScript Importer
+- Tailwind CSS IntelliSense
+
+### Debug Configurations
+
+The project includes VS Code launch configurations:
+
+```json
+{
+  "configurations": [
+    {
+      "name": "Launch Web App",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173"
+    },
+    {
+      "name": "Debug Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "--reporter=verbose"]
+    }
+  ]
+}
+```
+
+## Environment Variables
+
+Create a `.env.local` file in `apps/web/` for local configuration:
+
+```bash
+# API endpoints (optional)
+VITE_API_URL=http://localhost:3000
+VITE_WS_URL=ws://localhost:3000
+
+# Feature flags
+VITE_ENABLE_SIDECAR=true
+VITE_ENABLE_DEBUG=true
+
+# Storage
+VITE_CDN_URL=https://cdn.qemuweb.dev
+```
+
+## Common Tasks
+
+### Adding a New Package
+
+```bash
+# Create package directory
+mkdir packages/my-package
+cd packages/my-package
+
+# Initialize package.json
+pnpm init
+
+# Add to workspace (already configured in pnpm-workspace.yaml)
+```
+
+**Package template:**
+
+```json
+{
+  "name": "@qemuweb/my-package",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  }
+}
+```
+
+### Adding a Dependency
+
+```bash
+# Add to specific package
+pnpm --filter @qemuweb/runtime add lodash
+
+# Add dev dependency
+pnpm --filter @qemuweb/runtime add -D vitest
+
+# Add to all packages
+pnpm add -w typescript
+```
+
+### Creating a New Component
+
+Components live in `apps/web/src/components/`:
+
+```typescript
+// apps/web/src/components/MyComponent.tsx
+import { FC } from 'react';
+
+interface MyComponentProps {
+  title: string;
+}
+
+export const MyComponent: FC<MyComponentProps> = ({ title }) => {
+  return <div className="p-4 rounded-lg bg-gray-100">{title}</div>;
+};
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**pnpm install fails:**
+```bash
+# Clear cache and reinstall
+rm -rf node_modules pnpm-lock.yaml
+pnpm store prune
+pnpm install
+```
+
+**Build fails with memory error:**
+```bash
+# Increase Node.js memory
+export NODE_OPTIONS="--max-old-space-size=4096"
+pnpm build
+```
+
+**Tests fail with timeout:**
+```bash
+# Increase test timeout
+pnpm test -- --testTimeout=30000
+```
+
+**QEMU WASM build fails:**
+```bash
+# Ensure Docker has enough resources
+# Docker Desktop → Settings → Resources
+# Recommended: 8GB RAM, 4 CPUs
+```
+
+### Getting Help
+
+- **GitHub Issues**: [qemuweb/qemuweb/issues](https://github.com/qemuweb/qemuweb/issues)
+- **Discussions**: [qemuweb/qemuweb/discussions](https://github.com/qemuweb/qemuweb/discussions)
+- **Discord**: Coming soon
+
+## Next Steps
+
+Now that your environment is set up:
+
+1. Read the [Build System](/qemuweb/contributing/build-system/) documentation
+2. Review the [Architecture Overview](/qemuweb/architecture/overview/)
+3. Pick an issue labeled `good first issue` to work on
+4. Submit a pull request!

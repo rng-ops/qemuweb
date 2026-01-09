@@ -1,0 +1,1 @@
+export { CredentialManager } from './CredentialManager';

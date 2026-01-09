@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 650" width="900" height="650">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#34D399"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#60A5FA"/>
+    </marker>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="900" height="650" fill="#1F2937"/>
+  
+  <!-- Title -->
+  <rect x="0" y="0" width="900" height="50" fill="url(#headerGrad)"/>
+  <text x="450" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">Worker Protocol &amp; Message Flow</text>
+  
+  <!-- Main Thread Column -->
+  <rect x="30" y="70" width="380" height="560" rx="10" fill="#374151" filter="url(#shadow)"/>
+  <text x="220" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#60A5FA">MAIN THREAD</text>
+  
+  <!-- Worker Column -->
+  <rect x="490" y="70" width="380" height="560" rx="10" fill="#374151" filter="url(#shadow)"/>
+  <text x="680" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#34D399">WEB WORKER</text>
+  
+  <!-- QemuClient Box -->
+  <rect x="60" y="130" width="320" height="120" rx="8" fill="#1E3A5F"/>
+  <text x="220" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">QemuClient</text>
+  <text x="80" y="180" font-family="Arial, sans-serif" font-size="10" fill="#93C5FD">• init() → Waits for capabilities</text>
+  <text x="80" y="195" font-family="Arial, sans-serif" font-size="10" fill="#93C5FD">• startVm(id, profile, inputs)</text>
+  <text x="80" y="210" font-family="Arial, sans-serif" font-size="10" fill="#93C5FD">• stopVm(id) / resetVm(id)</text>
+  <text x="80" y="225" font-family="Arial, sans-serif" font-size="10" fill="#93C5FD">• sendSerialIn(id, data)</text>
+  <text x="80" y="240" font-family="Arial, sans-serif" font-size="10" fill="#93C5FD">• Pending request tracking</text>
+  
+  <!-- Worker Runtime Box -->
+  <rect x="520" y="130" width="320" height="120" rx="8" fill="#064E3B"/>
+  <text x="680" y="155" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">Worker Runtime</text>
+  <text x="540" y="180" font-family="Arial, sans-serif" font-size="10" fill="#6EE7B7">• Loads QEMU WASM module</text>
+  <text x="540" y="195" font-family="Arial, sans-serif" font-size="10" fill="#6EE7B7">• Mounts files to Emscripten FS</text>
+  <text x="540" y="210" font-family="Arial, sans-serif" font-size="10" fill="#6EE7B7">• Routes stdin/stdout</text>
+  <text x="540" y="225" font-family="Arial, sans-serif" font-size="10" fill="#6EE7B7">• Manages VM instances</text>
+  <text x="540" y="240" font-family="Arial, sans-serif" font-size="10" fill="#6EE7B7">• Detects browser capabilities</text>
+  
+  <!-- Commands Section -->
+  <text x="60" y="280" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#F59E0B">COMMANDS (UI → Worker)</text>
+  
+  <rect x="60" y="295" width="140" height="30" rx="4" fill="#78350F"/>
+  <text x="130" y="315" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#FCD34D">StartVmCommand</text>
+  
+  <rect x="210" y="295" width="140" height="30" rx="4" fill="#78350F"/>
+  <text x="280" y="315" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#FCD34D">StopVmCommand</text>
+  
+  <rect x="60" y="335" width="140" height="30" rx="4" fill="#78350F"/>
+  <text x="130" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#FCD34D">SerialInCommand</text>
+  
+  <rect x="210" y="335" width="140" height="30" rx="4" fill="#78350F"/>
+  <text x="280" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#FCD34D">SyncOverlayCommand</text>
+  
+  <!-- Events Section -->
+  <text x="540" y="280" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#8B5CF6">EVENTS (Worker → UI)</text>
+  
+  <rect x="520" y="295" width="130" height="30" rx="4" fill="#4C1D95"/>
+  <text x="585" y="315" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#C4B5FD">CapabilitiesEvent</text>
+  
+  <rect x="660" y="295" width="130" height="30" rx="4" fill="#4C1D95"/>
+  <text x="725" y="315" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#C4B5FD">VmStartedEvent</text>
+  
+  <rect x="520" y="335" width="130" height="30" rx="4" fill="#4C1D95"/>
+  <text x="585" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#C4B5FD">SerialOutEvent</text>
+  
+  <rect x="660" y="335" width="130" height="30" rx="4" fill="#4C1D95"/>
+  <text x="725" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#C4B5FD">ProgressEvent</text>
+  
+  <rect x="520" y="375" width="130" height="30" rx="4" fill="#4C1D95"/>
+  <text x="585" y="395" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#C4B5FD">VmErrorEvent</text>
+  
+  <rect x="660" y="375" width="130" height="30" rx="4" fill="#4C1D95"/>
+  <text x="725" y="395" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#C4B5FD">LogEvent</text>
+  
+  <!-- Message Flow Arrows -->
+  <text x="450" y="295" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#D1D5DB">postMessage</text>
+  
+  <path d="M380 310 L510 310" stroke="#F59E0B" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <path d="M510 350 L380 350" stroke="#8B5CF6" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  
+  <!-- Sequence Diagram -->
+  <text x="220" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">Startup Sequence</text>
+  
+  <!-- Timeline -->
+  <line x1="180" y1="440" x2="180" y2="600" stroke="#6B7280" stroke-width="2" stroke-dasharray="5,3"/>
+  <line x1="680" y1="440" x2="680" y2="600" stroke="#6B7280" stroke-width="2" stroke-dasharray="5,3"/>
+  
+  <!-- Step 1 -->
+  <circle cx="180" cy="460" r="12" fill="#3B82F6"/>
+  <text x="180" y="464" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">1</text>
+  <text x="90" y="464" text-anchor="end" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">new Worker()</text>
+  <path d="M195 460 L665 460" stroke="#60A5FA" stroke-width="1" marker-end="url(#arrowBlue)"/>
+  
+  <!-- Step 2 -->
+  <circle cx="680" cy="485" r="12" fill="#10B981"/>
+  <text x="680" y="489" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">2</text>
+  <text x="770" y="489" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">capabilities</text>
+  <path d="M665 485 L195 485" stroke="#34D399" stroke-width="1" marker-end="url(#arrowBlue)"/>
+  
+  <!-- Step 3 -->
+  <circle cx="180" cy="510" r="12" fill="#3B82F6"/>
+  <text x="180" y="514" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">3</text>
+  <text x="90" y="514" text-anchor="end" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">startVm</text>
+  <path d="M195 510 L665 510" stroke="#60A5FA" stroke-width="1" marker-end="url(#arrowGreen)"/>
+  
+  <!-- Step 4 -->
+  <circle cx="680" cy="535" r="12" fill="#10B981"/>
+  <text x="680" y="539" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">4</text>
+  <text x="770" y="539" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">progress</text>
+  <path d="M665 535 L195 535" stroke="#34D399" stroke-width="1" stroke-dasharray="3,2"/>
+  
+  <!-- Step 5 -->
+  <circle cx="680" cy="560" r="12" fill="#10B981"/>
+  <text x="680" y="564" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">5</text>
+  <text x="770" y="564" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">vmStarted</text>
+  <path d="M665 560 L195 560" stroke="#34D399" stroke-width="1" marker-end="url(#arrowBlue)"/>
+  
+  <!-- Step 6 -->
+  <circle cx="680" cy="585" r="12" fill="#10B981"/>
+  <text x="680" y="589" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">6</text>
+  <text x="770" y="589" font-family="Arial, sans-serif" font-size="9" fill="#D1D5DB">serialOut...</text>
+  <path d="M665 585 L195 585" stroke="#34D399" stroke-width="1" stroke-dasharray="3,2"/>
+  
+  <!-- Labels at bottom -->
+  <text x="180" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#60A5FA">UI Thread</text>
+  <text x="680" y="620" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#34D399">Worker Thread</text>
+</svg>

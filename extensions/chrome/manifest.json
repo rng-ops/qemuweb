@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "QemuWeb DevTools",
+  "version": "0.1.0",
+  "description": "Run QEMU virtual machines directly in your browser's DevTools panel",
+  "author": "QemuWeb Contributors",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage"
+  ],
+  "optional_permissions": [
+    "offscreen"
+  ],
+  "host_permissions": [],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "QemuWeb",
+    "default_popup": "popup/popup.html"
+  },
+  "devtools_page": "devtools/devtools.html",
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "cross_origin_embedder_policy": {
+    "value": "require-corp"
+  },
+  "cross_origin_opener_policy": {
+    "value": "same-origin"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["qemu/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

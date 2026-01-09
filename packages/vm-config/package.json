@@ -1,0 +1,38 @@
+{
+  "name": "@qemuweb/vm-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VM profile configuration and QEMU argument builder",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "generate-disk": "node --loader ts-node/esm scripts/generate-disk.ts"
+  },
+  "bin": {
+    "generate-disk": "./scripts/generate-disk.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}

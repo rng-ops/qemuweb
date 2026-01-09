@@ -1,0 +1,350 @@
+---
+title: Worker Protocol
+description: Understanding the communication protocol between Main Thread and Web Worker
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The Worker Protocol defines how the main thread communicates with the Web Worker running QEMU. It uses the browser's `postMessage` API with a structured message format.
+
+## Protocol Overview
+
+<div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
+  <img src="/qemuweb/diagrams/03-worker-protocol.svg" alt="Worker Protocol" style="width: 100%; height: auto;" />
+</div>
+
+Communication is bidirectional:
+- **Commands**: Main thread → Worker (requests to perform actions)
+- **Events**: Worker → Main thread (notifications and data)
+
+## Message Format
+
+All messages follow a discriminated union pattern with a `type` field:
+
+```typescript
+// Base message types
+type WorkerCommand = 
+  | { type: 'startVm'; config: VmConfig }
+  | { type: 'stopVm' }
+  | { type: 'serialIn'; data: string }
+  | { type: 'syncOverlay' };
+
+type WorkerEvent =
+  | { type: 'capabilities'; data: BrowserCapabilities }
+  | { type: 'vmStarted' }
+  | { type: 'vmStopped'; reason?: string }
+  | { type: 'serialOut'; data: string }
+  | { type: 'progress'; stage: string; percent: number }
+  | { type: 'error'; code: string; message: string }
+  | { type: 'log'; level: string; message: string };
+```
+
+## Commands (Main → Worker)
+
+### StartVm
+
+Initializes and starts the virtual machine with the provided configuration.
+
+```typescript
+{
+  type: 'startVm',
+  config: {
+    profile: 'alpineLinux',
+    memory: 128,
+    diskUrl: '/images/alpine-rootfs.bin',
+    kernelUrl: '/images/vmlinuz',
+    cmdline: 'console=ttyS0 root=/dev/vda',
+  }
+}
+```
+
+**Worker Response**: `vmStarted` event on success, `error` event on failure.
+
+### StopVm
+
+Gracefully stops the running virtual machine.
+
+```typescript
+{ type: 'stopVm' }
+```
+
+**Worker Response**: `vmStopped` event with optional reason.
+
+### SerialIn
+
+Sends data to the VM's serial console (keyboard input).
+
+```typescript
+{
+  type: 'serialIn',
+  data: 'ls -la\n'
+}
+```
+
+**Worker Response**: None (fire-and-forget). Output comes via `serialOut` events.
+
+### SyncOverlay
+
+Forces a sync of the Copy-on-Write overlay to IndexedDB.
+
+```typescript
+{ type: 'syncOverlay' }
+```
+
+**Worker Response**: None directly, but ensures durability.
+
+## Events (Worker → Main)
+
+### Capabilities
+
+Sent immediately when the worker starts. Reports browser feature support.
+
+```typescript
+{
+  type: 'capabilities',
+  data: {
+    sharedArrayBuffer: true,
+    crossOriginIsolated: true,
+    atomics: true,
+    indexedDB: true,
+    storageEstimate: {
+      quota: 1073741824,  // 1GB
+      usage: 52428800     // 50MB used
+    }
+  }
+}
+```
+
+### VmStarted
+
+Indicates the VM has successfully started and is ready for interaction.
+
+```typescript
+{ type: 'vmStarted' }
+```
+
+### VmStopped
+
+Indicates the VM has stopped, either gracefully or due to an error.
+
+```typescript
+{
+  type: 'vmStopped',
+  reason: 'user_request' | 'guest_shutdown' | 'error'
+}
+```
+
+### SerialOut
+
+Data output from the VM's serial console.
+
+```typescript
+{
+  type: 'serialOut',
+  data: 'Login: '
+}
+```
+
+<Aside type="note">
+  Serial output is sent as soon as available. It may arrive in small chunks or large buffers depending on the guest OS.
+</Aside>
+
+### Progress
+
+Reports progress during long operations (loading, initialization).
+
+```typescript
+{
+  type: 'progress',
+  stage: 'loading_wasm' | 'loading_kernel' | 'loading_disk' | 'booting',
+  percent: 75
+}
+```
+
+### Error
+
+Reports an error condition.
+
+```typescript
+{
+  type: 'error',
+  code: 'WASM_LOAD_FAILED' | 'VM_CRASH' | 'STORAGE_FULL' | 'INVALID_CONFIG',
+  message: 'Human-readable error description'
+}
+```
+
+### Log
+
+Debug/info logging from the worker.
+
+```typescript
+{
+  type: 'log',
+  level: 'debug' | 'info' | 'warn' | 'error',
+  message: 'QEMU initialized with 128MB RAM'
+}
+```
+
+## Startup Sequence
+
+```
+Main Thread                    Web Worker
+    │                              │
+    │─────── create worker ────────▶│
+    │                              │
+    │◀─────── capabilities ────────│
+    │                              │
+    │──────── startVm(cfg) ───────▶│
+    │                              │
+    │◀──── progress(loading) ──────│
+    │◀──── progress(booting) ──────│
+    │                              │
+    │◀──────── vmStarted ──────────│
+    │                              │
+    │◀──────── serialOut ──────────│
+    │                              │
+```
+
+## Implementation Details
+
+### QemuClient (Main Thread)
+
+The `QemuClient` class wraps the worker communication:
+
+```typescript
+// packages/runtime/src/client.ts
+export class QemuClient extends EventEmitter {
+  private worker: Worker;
+  
+  constructor(config: ClientConfig) {
+    this.worker = new Worker(config.workerUrl);
+    this.worker.onmessage = (e) => this.handleEvent(e.data);
+  }
+  
+  async start(profile: VmProfile): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.once('vmStarted', resolve);
+      this.once('error', reject);
+      this.postCommand({ type: 'startVm', config: profile });
+    });
+  }
+  
+  sendSerial(data: string): void {
+    this.postCommand({ type: 'serialIn', data });
+  }
+  
+  private postCommand(cmd: WorkerCommand): void {
+    this.worker.postMessage(cmd);
+  }
+  
+  private handleEvent(event: WorkerEvent): void {
+    this.emit(event.type, event.data ?? event);
+  }
+}
+```
+
+### Worker Runtime
+
+The worker side handles incoming commands:
+
+```typescript
+// packages/runtime/src/worker.ts
+self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
+  const cmd = e.data;
+  
+  switch (cmd.type) {
+    case 'startVm':
+      await startVm(cmd.config);
+      postEvent({ type: 'vmStarted' });
+      break;
+      
+    case 'stopVm':
+      await stopVm();
+      postEvent({ type: 'vmStopped', reason: 'user_request' });
+      break;
+      
+    case 'serialIn':
+      writeToSerial(cmd.data);
+      break;
+      
+    case 'syncOverlay':
+      await syncOverlay();
+      break;
+  }
+};
+
+function postEvent(event: WorkerEvent): void {
+  self.postMessage(event);
+}
+```
+
+## Error Handling
+
+### Command Failures
+
+If a command fails, the worker sends an `error` event:
+
+```typescript
+try {
+  await startVm(config);
+  postEvent({ type: 'vmStarted' });
+} catch (e) {
+  postEvent({
+    type: 'error',
+    code: 'VM_START_FAILED',
+    message: e.message
+  });
+}
+```
+
+### Worker Crash Recovery
+
+If the worker crashes, you can detect it via the `error` event on the Worker object:
+
+```typescript
+this.worker.onerror = (e) => {
+  console.error('Worker crashed:', e);
+  this.emit('error', { code: 'WORKER_CRASH', message: e.message });
+};
+```
+
+## Performance Tips
+
+1. **Batch serial input**: Instead of sending character-by-character, batch into lines
+2. **Throttle serial output**: High-speed output can overwhelm the main thread
+3. **Use Transferable objects**: For large binary data, use `transfer` option
+4. **Avoid blocking**: Never use synchronous operations in message handlers
+
+## Type Definitions
+
+The full protocol types are defined in:
+
+```typescript
+// packages/runtime/src/protocol.ts
+export interface WorkerCommand {
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface WorkerEvent {
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface BrowserCapabilities {
+  sharedArrayBuffer: boolean;
+  crossOriginIsolated: boolean;
+  atomics: boolean;
+  indexedDB: boolean;
+  storageEstimate: StorageEstimate;
+}
+
+export interface VmConfig {
+  profile: string;
+  memory: number;
+  diskUrl: string;
+  kernelUrl?: string;
+  cmdline?: string;
+  networkConfig?: NetworkConfig;
+}
+```

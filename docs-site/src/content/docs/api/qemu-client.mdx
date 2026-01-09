@@ -1,0 +1,494 @@
+---
+title: QEMU Client API
+description: Complete API reference for the QEMUClient class
+---
+
+import { Aside, Badge } from '@astrojs/starlight/components';
+
+The `QEMUClient` is the primary interface for controlling QEMU virtual machines from your application code.
+
+## Installation
+
+```bash
+pnpm add @qemuweb/runtime
+```
+
+## Import
+
+```typescript
+import { QEMUClient } from '@qemuweb/runtime';
+```
+
+## Constructor
+
+```typescript
+new QEMUClient(options: QEMUClientOptions)
+```
+
+### QEMUClientOptions
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `memory` | `number` | No | `128` | RAM in MB |
+| `canvas` | `HTMLCanvasElement` | Yes | - | Display canvas element |
+| `workerUrl` | `string` | No | Built-in | URL to QEMU worker script |
+| `wasmUrl` | `string` | No | Built-in | URL to QEMU WASM binary |
+| `dataUrl` | `string` | No | Built-in | URL to QEMU data files |
+
+### Example
+
+```typescript
+const canvas = document.getElementById('display') as HTMLCanvasElement;
+
+const client = new QEMUClient({
+  memory: 256,
+  canvas,
+});
+```
+
+---
+
+## Methods
+
+### start()
+
+<Badge text="async" variant="tip" />
+
+Start the virtual machine with the specified configuration.
+
+```typescript
+async start(config: VMStartConfig): Promise<void>
+```
+
+#### VMStartConfig
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `blockDevices` | `BlockDevice[]` | Yes | Array of block devices |
+| `cmdline` | `string` | No | Kernel command line |
+| `networkEnabled` | `boolean` | No | Enable networking |
+| `serialCallback` | `(data: string) => void` | No | Serial output callback |
+
+#### Example
+
+```typescript
+import { HttpBlockDevice } from '@qemuweb/storage';
+
+const disk = new HttpBlockDevice('https://example.com/disk.qcow2', {
+  size: 1024 * 1024 * 1024, // 1GB
+});
+
+await client.start({
+  blockDevices: [disk],
+  cmdline: 'console=ttyS0',
+  serialCallback: (data) => console.log(data),
+});
+```
+
+---
+
+### stop()
+
+<Badge text="async" variant="tip" />
+
+Stop the virtual machine.
+
+```typescript
+async stop(): Promise<void>
+```
+
+#### Example
+
+```typescript
+await client.stop();
+console.log('VM stopped');
+```
+
+---
+
+### restart()
+
+<Badge text="async" variant="tip" />
+
+Restart the virtual machine.
+
+```typescript
+async restart(): Promise<void>
+```
+
+<Aside type="note">
+  Equivalent to calling `stop()` followed by `start()` with the same configuration.
+</Aside>
+
+---
+
+### sendKey()
+
+Send a keyboard key event to the VM.
+
+```typescript
+sendKey(keyCode: string, down: boolean): void
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `keyCode` | `string` | Key code (e.g., 'KeyA', 'Enter', 'Escape') |
+| `down` | `boolean` | `true` for keydown, `false` for keyup |
+
+#### Example
+
+```typescript
+// Type 'a'
+client.sendKey('KeyA', true);
+client.sendKey('KeyA', false);
+
+// Press Enter
+client.sendKey('Enter', true);
+client.sendKey('Enter', false);
+
+// Ctrl+C
+client.sendKey('ControlLeft', true);
+client.sendKey('KeyC', true);
+client.sendKey('KeyC', false);
+client.sendKey('ControlLeft', false);
+```
+
+---
+
+### sendMouse()
+
+Send a mouse event to the VM.
+
+```typescript
+sendMouse(x: number, y: number, buttons: number): void
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | `number` | X coordinate (0-canvas width) |
+| `y` | `number` | Y coordinate (0-canvas height) |
+| `buttons` | `number` | Button mask (1=left, 2=right, 4=middle) |
+
+#### Example
+
+```typescript
+// Move mouse to position
+client.sendMouse(100, 200, 0);
+
+// Left click
+client.sendMouse(100, 200, 1);
+client.sendMouse(100, 200, 0);
+
+// Right click
+client.sendMouse(100, 200, 2);
+client.sendMouse(100, 200, 0);
+```
+
+---
+
+### writeSerial()
+
+Write data to the VM's serial port.
+
+```typescript
+writeSerial(data: string): void
+```
+
+#### Example
+
+```typescript
+// Send a command
+client.writeSerial('ls -la\n');
+
+// Send Ctrl+C
+client.writeSerial('\x03');
+```
+
+---
+
+### readSerial()
+
+<Badge text="async" variant="tip" />
+
+Read from the serial port (one-time read).
+
+```typescript
+async readSerial(timeout?: number): Promise<string>
+```
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout` | `number` | `5000` | Timeout in milliseconds |
+
+#### Example
+
+```typescript
+const output = await client.readSerial(10000);
+console.log('Serial output:', output);
+```
+
+---
+
+### on()
+
+Register an event listener.
+
+```typescript
+on(event: EventType, callback: EventCallback): void
+```
+
+#### Events
+
+| Event | Callback Signature | Description |
+|-------|-------------------|-------------|
+| `'ready'` | `() => void` | VM is ready |
+| `'started'` | `() => void` | VM has started |
+| `'stopped'` | `() => void` | VM has stopped |
+| `'error'` | `(error: Error) => void` | Error occurred |
+| `'serial'` | `(data: string) => void` | Serial data received |
+| `'display'` | `(frame: ImageData) => void` | Display frame update |
+
+#### Example
+
+```typescript
+client.on('ready', () => {
+  console.log('VM is ready');
+});
+
+client.on('error', (error) => {
+  console.error('VM error:', error);
+});
+
+client.on('serial', (data) => {
+  terminal.write(data);
+});
+```
+
+---
+
+### off()
+
+Remove an event listener.
+
+```typescript
+off(event: EventType, callback: EventCallback): void
+```
+
+---
+
+### getState()
+
+Get the current VM state.
+
+```typescript
+getState(): VMState
+```
+
+#### VMState
+
+```typescript
+type VMState = 'idle' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error';
+```
+
+#### Example
+
+```typescript
+const state = client.getState();
+if (state === 'running') {
+  console.log('VM is running');
+}
+```
+
+---
+
+### getMetrics()
+
+<Badge text="async" variant="tip" />
+
+Get VM performance metrics.
+
+```typescript
+async getMetrics(): Promise<VMMetrics>
+```
+
+#### VMMetrics
+
+```typescript
+interface VMMetrics {
+  cpuUsage: number;      // 0-100 percentage
+  memoryUsed: number;    // Bytes
+  memoryTotal: number;   // Bytes
+  diskReads: number;     // Total reads
+  diskWrites: number;    // Total writes
+  networkRx: number;     // Bytes received
+  networkTx: number;     // Bytes transmitted
+  uptime: number;        // Seconds
+}
+```
+
+#### Example
+
+```typescript
+const metrics = await client.getMetrics();
+console.log(`CPU: ${metrics.cpuUsage}%`);
+console.log(`Memory: ${metrics.memoryUsed / 1024 / 1024}MB`);
+```
+
+---
+
+### takeSnapshot()
+
+<Badge text="async" variant="tip" />
+<Badge text="experimental" variant="caution" />
+
+Create a VM state snapshot.
+
+```typescript
+async takeSnapshot(name: string): Promise<Snapshot>
+```
+
+#### Snapshot
+
+```typescript
+interface Snapshot {
+  id: string;
+  name: string;
+  timestamp: number;
+  size: number;
+}
+```
+
+---
+
+### restoreSnapshot()
+
+<Badge text="async" variant="tip" />
+<Badge text="experimental" variant="caution" />
+
+Restore a VM from a snapshot.
+
+```typescript
+async restoreSnapshot(id: string): Promise<void>
+```
+
+---
+
+### loadBlockDevice()
+
+<Badge text="async" variant="tip" />
+
+Dynamically load an additional block device.
+
+```typescript
+async loadBlockDevice(device: BlockDevice, index: number): Promise<void>
+```
+
+#### Example
+
+```typescript
+const extraDisk = new FileBlockDevice(fileHandle);
+await client.loadBlockDevice(extraDisk, 1); // hdb
+```
+
+---
+
+## Properties
+
+### ready
+
+<Badge text="readonly" variant="note" />
+
+Whether the VM is ready.
+
+```typescript
+get ready(): boolean
+```
+
+### running
+
+<Badge text="readonly" variant="note" />
+
+Whether the VM is currently running.
+
+```typescript
+get running(): boolean
+```
+
+---
+
+## Full Example
+
+```typescript
+import { QEMUClient } from '@qemuweb/runtime';
+import { HttpBlockDevice, COWBlockDevice, IndexedDBOverlay } from '@qemuweb/storage';
+
+async function main() {
+  // Setup canvas
+  const canvas = document.getElementById('display') as HTMLCanvasElement;
+  canvas.width = 800;
+  canvas.height = 600;
+
+  // Create client
+  const client = new QEMUClient({
+    memory: 256,
+    canvas,
+  });
+
+  // Setup events
+  client.on('ready', () => console.log('Ready'));
+  client.on('error', (e) => console.error(e));
+
+  // Create COW disk with persistence
+  const baseDisk = new HttpBlockDevice(
+    'https://cdn.example.com/alpine.qcow2',
+    { size: 512 * 1024 * 1024 }
+  );
+  
+  const overlay = new IndexedDBOverlay('my-vm-disk');
+  const cowDisk = new COWBlockDevice(baseDisk, overlay);
+
+  // Start VM
+  await client.start({
+    blockDevices: [cowDisk],
+    cmdline: 'console=ttyS0 root=/dev/vda',
+    serialCallback: (data) => {
+      document.getElementById('terminal')!.textContent += data;
+    },
+  });
+
+  // Wait for boot, then run command
+  setTimeout(async () => {
+    client.writeSerial('uname -a\n');
+    const output = await client.readSerial();
+    console.log('Kernel:', output);
+  }, 30000);
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    client.stop();
+  });
+}
+
+main();
+```
+
+---
+
+## TypeScript Types
+
+```typescript
+import type {
+  QEMUClient,
+  QEMUClientOptions,
+  VMStartConfig,
+  VMState,
+  VMMetrics,
+  Snapshot,
+} from '@qemuweb/runtime';
+```

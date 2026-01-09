@@ -1,0 +1,522 @@
+---
+title: VM Configuration API
+description: API reference for building and configuring virtual machines
+---
+
+import { Aside, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
+
+The `@qemuweb/vm-config` package provides a type-safe configuration system for defining virtual machine profiles.
+
+## Installation
+
+```bash
+pnpm add @qemuweb/vm-config
+```
+
+## VMConfigBuilder
+
+Fluent builder API for creating VM configurations.
+
+```typescript
+import { VMConfigBuilder } from '@qemuweb/vm-config';
+```
+
+### Constructor
+
+```typescript
+new VMConfigBuilder(name: string)
+```
+
+### Methods
+
+All builder methods return `this` for chaining.
+
+---
+
+#### profile()
+
+Set the VM profile.
+
+```typescript
+profile(p: VMProfile): this
+```
+
+Available profiles:
+
+| Profile | Description | Memory | vCPUs |
+|---------|-------------|--------|-------|
+| `'alpineLinux'` | Minimal Alpine Linux | 128MB | 1 |
+| `'alpineRouter'` | Network router | 64MB | 1 |
+| `'devContainer'` | Development environment | 512MB | 2 |
+| `'vault'` | HashiCorp Vault | 256MB | 1 |
+| `'webServer'` | Nginx/Apache | 256MB | 1 |
+| `'database'` | PostgreSQL/MySQL | 512MB | 2 |
+
+---
+
+#### memory()
+
+Set RAM in megabytes.
+
+```typescript
+memory(mb: number): this
+```
+
+<Aside type="caution">
+  Memory is limited by browser constraints. Recommended maximum is 2GB.
+</Aside>
+
+---
+
+#### vcpus()
+
+Set number of virtual CPUs.
+
+```typescript
+vcpus(count: number): this
+```
+
+---
+
+#### disk()
+
+Add a disk device.
+
+```typescript
+disk(config: DiskConfig): this
+```
+
+##### DiskConfig
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `source` | `DiskSource` | Yes | Disk source configuration |
+| `bus` | `'virtio' \| 'ide' \| 'scsi'` | No | Bus type (default: virtio) |
+| `bootable` | `boolean` | No | Boot from this disk |
+| `readonly` | `boolean` | No | Read-only mode |
+
+##### DiskSource Types
+
+```typescript
+// HTTP source
+{ type: 'http', url: string, size: number }
+
+// File source
+{ type: 'file', handle: FileSystemFileHandle }
+
+// Atlas store
+{ type: 'atlas', imageName: string }
+
+// Empty disk
+{ type: 'empty', size: number }
+```
+
+---
+
+#### network()
+
+Add a network interface.
+
+```typescript
+network(config: NetworkConfig): this
+```
+
+##### NetworkConfig
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | `'user' \| 'tap' \| 'bridge'` | Yes | Network type |
+| `mac` | `string` | No | MAC address |
+| `ip` | `string` | No | Static IP |
+| `gateway` | `string` | No | Gateway IP |
+| `dns` | `string[]` | No | DNS servers |
+| `hostfwd` | `PortForward[]` | No | Port forwards |
+
+---
+
+#### serial()
+
+Configure serial port.
+
+```typescript
+serial(config: SerialConfig): this
+```
+
+##### SerialConfig
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `enabled` | `boolean` | No | Enable serial (default: true) |
+| `type` | `'pty' \| 'stdio' \| 'callback'` | No | Output type |
+| `callback` | `(data: string) => void` | No | Data callback |
+
+---
+
+#### display()
+
+Configure display.
+
+```typescript
+display(config: DisplayConfig): this
+```
+
+##### DisplayConfig
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `type` | `'vnc' \| 'canvas' \| 'none'` | Yes | Display type |
+| `canvas` | `HTMLCanvasElement` | If canvas | Target canvas |
+| `width` | `number` | No | Display width |
+| `height` | `number` | No | Display height |
+
+---
+
+#### cmdline()
+
+Set kernel command line.
+
+```typescript
+cmdline(args: string): this
+```
+
+Common options:
+
+```
+console=ttyS0          # Serial console
+root=/dev/vda          # Root device
+init=/sbin/init        # Init process
+quiet                  # Suppress boot messages
+```
+
+---
+
+#### env()
+
+Set environment variables (for containers).
+
+```typescript
+env(vars: Record<string, string>): this
+```
+
+---
+
+#### volumes()
+
+Add volume mounts.
+
+```typescript
+volumes(mounts: VolumeMount[]): this
+```
+
+##### VolumeMount
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `source` | `string` | Source path or volume name |
+| `target` | `string` | Mount point in container |
+| `readonly` | `boolean` | Read-only mount |
+
+---
+
+#### build()
+
+Build the final configuration.
+
+```typescript
+build(): VMConfig
+```
+
+---
+
+### Example
+
+```typescript
+import { VMConfigBuilder } from '@qemuweb/vm-config';
+
+const config = new VMConfigBuilder('web-server')
+  .profile('alpineLinux')
+  .memory(256)
+  .vcpus(1)
+  .disk({
+    source: { type: 'http', url: 'https://cdn.example.com/alpine.qcow2', size: 512 * 1024 * 1024 },
+    bootable: true,
+  })
+  .disk({
+    source: { type: 'empty', size: 1024 * 1024 * 1024 },
+    bus: 'virtio',
+  })
+  .network({
+    type: 'user',
+    hostfwd: [
+      { hostPort: 8080, guestPort: 80, protocol: 'tcp' },
+      { hostPort: 8443, guestPort: 443, protocol: 'tcp' },
+    ],
+  })
+  .serial({
+    enabled: true,
+    callback: (data) => terminal.write(data),
+  })
+  .display({
+    type: 'canvas',
+    canvas: document.getElementById('screen') as HTMLCanvasElement,
+  })
+  .cmdline('console=ttyS0 root=/dev/vda quiet')
+  .build();
+```
+
+---
+
+## VMConfig Interface
+
+The configuration object produced by the builder.
+
+```typescript
+interface VMConfig {
+  name: string;
+  profile: VMProfile;
+  memory: number;
+  vcpus: number;
+  disks: DiskConfig[];
+  networks: NetworkConfig[];
+  serial: SerialConfig;
+  display: DisplayConfig;
+  cmdline: string;
+  env: Record<string, string>;
+  volumes: VolumeMount[];
+}
+```
+
+---
+
+## Preset Configurations
+
+### profiles
+
+Pre-defined VM profiles.
+
+```typescript
+import { profiles } from '@qemuweb/vm-config';
+
+const alpine = profiles.alpineLinux;
+// { memory: 128, vcpus: 1, cmdline: '...' }
+
+const router = profiles.alpineRouter;
+// { memory: 64, vcpus: 1, cmdline: '...', network: {...} }
+```
+
+### createFromProfile()
+
+<Badge text="async" variant="tip" />
+
+Create a config from a profile name.
+
+```typescript
+import { createFromProfile } from '@qemuweb/vm-config';
+
+const config = await createFromProfile('alpineLinux', {
+  memory: 256, // Override memory
+});
+```
+
+---
+
+## Container Configuration
+
+For container-style workloads.
+
+### ContainerConfigBuilder
+
+```typescript
+import { ContainerConfigBuilder } from '@qemuweb/vm-config';
+
+const container = new ContainerConfigBuilder('my-app')
+  .image('docker.io/library/nginx:alpine')
+  .memory(128)
+  .expose(80)
+  .env({
+    NGINX_HOST: 'localhost',
+    NGINX_PORT: '80',
+  })
+  .volume('/data', '/app/data')
+  .command(['nginx', '-g', 'daemon off;'])
+  .build();
+```
+
+### ContainerConfigBuilder Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `image()` | `(ref: string): this` | Container image reference |
+| `expose()` | `(port: number, protocol?: string): this` | Expose port |
+| `env()` | `(vars: Record<string, string>): this` | Environment variables |
+| `volume()` | `(source: string, target: string): this` | Mount volume |
+| `command()` | `(cmd: string[]): this` | Override command |
+| `entrypoint()` | `(entry: string[]): this` | Override entrypoint |
+| `workdir()` | `(dir: string): this` | Working directory |
+| `user()` | `(user: string): this` | Run as user |
+
+---
+
+## Infrastructure Configuration
+
+For multi-VM setups.
+
+### InfrastructureBuilder
+
+```typescript
+import { InfrastructureBuilder } from '@qemuweb/vm-config';
+
+const infra = new InfrastructureBuilder('production')
+  .network('frontend', { cidr: '10.0.1.0/24' })
+  .network('backend', { cidr: '10.0.2.0/24' })
+  .vm('web', webConfig, ['frontend'])
+  .vm('api', apiConfig, ['frontend', 'backend'])
+  .vm('db', dbConfig, ['backend'])
+  .firewall([
+    { from: 'frontend', to: 'backend', ports: [3000], allow: true },
+    { from: 'backend', to: 'frontend', allow: false },
+  ])
+  .build();
+```
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `network(name, config)` | Define a network |
+| `vm(name, config, networks)` | Add a VM to networks |
+| `firewall(rules)` | Define firewall rules |
+| `route(from, to, via)` | Add routing rule |
+| `build()` | Generate infrastructure config |
+
+---
+
+## Disk Image Registry
+
+Manage disk image sources.
+
+### ImageRegistry
+
+```typescript
+import { ImageRegistry } from '@qemuweb/vm-config';
+
+const registry = new ImageRegistry();
+
+// Register an image
+registry.register('alpine:3.19', {
+  url: 'https://cdn.example.com/alpine-3.19.qcow2',
+  size: 512 * 1024 * 1024,
+  checksum: 'sha256:abc123...',
+});
+
+// Get image info
+const info = registry.get('alpine:3.19');
+
+// Use in config
+const config = new VMConfigBuilder('test')
+  .disk({
+    source: registry.toDiskSource('alpine:3.19'),
+    bootable: true,
+  })
+  .build();
+```
+
+### Default Registry
+
+```typescript
+import { defaultRegistry } from '@qemuweb/vm-config';
+
+// Pre-configured images
+defaultRegistry.list();
+// ['alpine:3.19', 'alpine:3.18', 'debian:bookworm', ...]
+```
+
+---
+
+## Validation
+
+### validateConfig()
+
+Validate a VM configuration.
+
+```typescript
+import { validateConfig } from '@qemuweb/vm-config';
+
+const result = validateConfig(config);
+
+if (!result.valid) {
+  console.error('Validation errors:', result.errors);
+}
+```
+
+### ValidationResult
+
+```typescript
+interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+}
+
+interface ValidationError {
+  path: string;
+  message: string;
+  code: string;
+}
+```
+
+---
+
+## Serialization
+
+### toJSON()
+
+Serialize config to JSON.
+
+```typescript
+const json = JSON.stringify(config);
+```
+
+### fromJSON()
+
+<Badge text="async" variant="tip" />
+
+Deserialize config from JSON.
+
+```typescript
+import { fromJSON } from '@qemuweb/vm-config';
+
+const config = await fromJSON(jsonString);
+```
+
+### toYAML()
+
+Export as YAML (for docker-compose style).
+
+```typescript
+import { toYAML } from '@qemuweb/vm-config';
+
+const yaml = toYAML(config);
+```
+
+---
+
+## TypeScript Types
+
+```typescript
+import type {
+  VMConfig,
+  VMProfile,
+  VMConfigBuilder,
+  DiskConfig,
+  DiskSource,
+  NetworkConfig,
+  PortForward,
+  SerialConfig,
+  DisplayConfig,
+  VolumeMount,
+  ContainerConfig,
+  InfrastructureConfig,
+  ValidationResult,
+} from '@qemuweb/vm-config';
+```

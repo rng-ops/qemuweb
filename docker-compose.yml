@@ -1,0 +1,36 @@
+name: qemuweb
+
+services:
+  # Production web (static) served via nginx
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    ports:
+      - "8080:80"
+
+  # Run the full monorepo build in Docker
+  build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    entrypoint: ["pnpm", "build"]
+
+  # Run the full monorepo test suite in Docker
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+
+  # Deterministic QEMU->Wasm build (artifact generator)
+  # Writes output into ./packages/qemu-wasm/dist on the host.
+  qemu-wasm:
+    build:
+      context: ./packages/qemu-wasm
+      dockerfile: Dockerfile
+    volumes:
+      - ./packages/qemu-wasm/dist:/output
+    profiles: ["qemu"]

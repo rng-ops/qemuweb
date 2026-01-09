@@ -1,0 +1,328 @@
+---
+title: Storage System
+description: Understanding QemuWeb's block device layer, Copy-on-Write storage, and content-addressed deduplication
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+QemuWeb's storage system provides persistent, efficient virtual disk storage using browser-native technologies. This page explains the layered architecture and key concepts.
+
+## Storage Architecture
+
+<div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
+  <img src="/qemuweb/diagrams/02-cow-storage.svg" alt="Copy-on-Write Storage" style="width: 100%; height: auto;" />
+</div>
+
+The storage system consists of three main layers:
+
+### 1. Block Device Interface
+
+All storage backends implement a common interface:
+
+```typescript
+interface BlockDevice {
+  readonly blockSize: number;      // Always 64KB (65536 bytes)
+  readonly totalBlocks: number;    // Total blocks in device
+  
+  read(blockIndex: number): Promise<Uint8Array>;
+  write(blockIndex: number, data: Uint8Array): Promise<void>;
+  sync(): Promise<void>;
+}
+```
+
+### 2. Block Device Implementations
+
+<CardGrid>
+  <Card title="HttpBlockDevice" icon="external">
+    Reads blocks from a remote URL. Used for base images hosted on CDN.
+  </Card>
+  <Card title="FileBlockDevice" icon="document">
+    Reads from a local File object. Used when user uploads a disk image.
+  </Card>
+  <Card title="CowBlockDevice" icon="seti:todo">
+    Copy-on-Write wrapper. Intercepts writes and stores them separately.
+  </Card>
+  <Card title="IndexedDbOverlay" icon="seti:db">
+    Stores dirty blocks in IndexedDB for persistence across sessions.
+  </Card>
+</CardGrid>
+
+### 3. Atlas Store (Content-Addressed)
+
+<div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
+  <img src="/qemuweb/diagrams/05-atlas-store.svg" alt="Atlas Store" style="width: 100%; height: auto;" />
+</div>
+
+The Atlas Store provides content-addressed storage with deduplication:
+
+- Blocks are identified by their SHA-256 hash
+- Identical blocks are stored only once
+- Zero blocks are never stored (sparse file support)
+- Manifests map block indices to content hashes
+
+## Copy-on-Write (COW) Storage
+
+COW storage is the key to efficient VM disk management:
+
+### How It Works
+
+1. **Base Image**: Read-only, often fetched from network
+2. **Overlay**: Read-write, stores only modified blocks
+3. **Read Path**: Check overlay first, fall back to base
+4. **Write Path**: Always writes to overlay
+
+```typescript
+class CowBlockDevice implements BlockDevice {
+  constructor(
+    private base: BlockDevice,      // Read-only base
+    private overlay: BlockDevice    // Read-write overlay
+  ) {}
+  
+  async read(blockIndex: number): Promise<Uint8Array> {
+    // Try overlay first
+    const overlayData = await this.overlay.read(blockIndex);
+    if (overlayData) return overlayData;
+    
+    // Fall back to base
+    return this.base.read(blockIndex);
+  }
+  
+  async write(blockIndex: number, data: Uint8Array): Promise<void> {
+    // Always write to overlay
+    await this.overlay.write(blockIndex, data);
+  }
+}
+```
+
+### Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Storage Efficiency** | Only changed blocks stored, not entire disk |
+| **Fast Startup** | Base image can be lazy-loaded |
+| **Easy Snapshots** | Just save the overlay state |
+| **Sharing** | Multiple VMs share same base image |
+
+## IndexedDB Persistence
+
+The `IndexedDbOverlay` stores dirty blocks in the browser's IndexedDB:
+
+### Database Schema
+
+```typescript
+// Database: 'qemuweb-storage'
+// Object Store: 'overlays'
+
+interface OverlayEntry {
+  key: string;           // `${vmId}:${blockIndex}`
+  vmId: string;          // VM identifier
+  blockIndex: number;    // Block number
+  data: ArrayBuffer;     // 64KB block data
+  timestamp: number;     // Last modified
+}
+```
+
+### Usage Pattern
+
+```typescript
+import { IndexedDbOverlay } from '@qemuweb/storage';
+
+// Create overlay for a specific VM
+const overlay = new IndexedDbOverlay('my-vm-id');
+await overlay.open();
+
+// Write a block
+await overlay.write(42, new Uint8Array(65536));
+
+// Read it back
+const data = await overlay.read(42);
+
+// Sync to ensure durability
+await overlay.sync();
+```
+
+### Storage Limits
+
+<Aside type="caution">
+  IndexedDB has storage limits that vary by browser. QemuWeb checks available quota at startup.
+</Aside>
+
+| Browser | Default Limit | Can Request More |
+|---------|---------------|------------------|
+| Chrome | 60% of disk | Yes, via Storage API |
+| Firefox | 50% of disk | Yes, via Storage API |
+| Safari | 1GB | Prompts user |
+
+```typescript
+// Request persistent storage
+const persisted = await navigator.storage.persist();
+console.log('Persistent storage:', persisted);
+
+// Check quota
+const estimate = await navigator.storage.estimate();
+console.log('Quota:', estimate.quota);
+console.log('Usage:', estimate.usage);
+```
+
+## Atlas Store Deep Dive
+
+The Atlas Store implements content-addressed storage (CAS) for maximum efficiency:
+
+### Key Concepts
+
+1. **Content Identifier (CID)**: SHA-256 hash of block data
+2. **Manifest**: Array mapping block indices to CIDs
+3. **Deduplication**: Same content → same CID → stored once
+4. **Sparse Files**: Zero blocks have null CID (not stored)
+
+### Data Flow
+
+```
+Write Block 42 with data D
+        │
+        ▼
+Hash D → sha256:abc123...
+        │
+        ▼
+Check if CID exists?
+        │
+   ┌────┴────┐
+   │ Yes     │ No
+   │         ▼
+   │    Store in 'blocks'
+   │         │
+   └────┬────┘
+        │
+        ▼
+Update manifest[42] = 'sha256:abc123...'
+```
+
+### Implementation
+
+```typescript
+class AtlasStore {
+  private db: IDBDatabase;
+  
+  async writeBlock(vmId: string, index: number, data: Uint8Array): Promise<void> {
+    // Check if all zeros (sparse)
+    if (isAllZeros(data)) {
+      await this.updateManifest(vmId, index, null);
+      return;
+    }
+    
+    // Compute content hash
+    const cid = await sha256(data);
+    
+    // Store block if new
+    if (!await this.hasBlock(cid)) {
+      await this.storeBlock(cid, data);
+    }
+    
+    // Update manifest
+    await this.updateManifest(vmId, index, cid);
+  }
+  
+  async readBlock(vmId: string, index: number): Promise<Uint8Array> {
+    const manifest = await this.getManifest(vmId);
+    const cid = manifest[index];
+    
+    // Sparse block
+    if (cid === null) {
+      return new Uint8Array(65536); // Return zeros
+    }
+    
+    return this.getBlock(cid);
+  }
+}
+```
+
+### Deduplication Example
+
+```
+VM1 Disk:  [A] [B] [C] [0] [A] [D]
+VM2 Disk:  [A] [E] [C] [0] [F] [A]
+
+Atlas Store blocks:
+  sha256:A... → data for A (stored once!)
+  sha256:B... → data for B
+  sha256:C... → data for C (stored once!)
+  sha256:D... → data for D
+  sha256:E... → data for E
+  sha256:F... → data for F
+
+Zero blocks [0] → not stored at all
+```
+
+## Block Size
+
+All block devices use a fixed 64KB block size:
+
+```typescript
+const BLOCK_SIZE = 65536; // 64 * 1024 bytes
+```
+
+### Why 64KB?
+
+- **IndexedDB Efficiency**: Balances transaction overhead vs. granularity
+- **Deduplication**: Small enough for meaningful deduplication
+- **Memory**: Reasonable buffer size for JavaScript
+- **Alignment**: Common filesystem block size multiple
+
+## Performance Optimization
+
+### Block Caching
+
+Frequently accessed blocks are cached in memory:
+
+```typescript
+class CachedBlockDevice implements BlockDevice {
+  private cache = new LRUCache<number, Uint8Array>(100); // 100 blocks = 6.4MB
+  
+  async read(blockIndex: number): Promise<Uint8Array> {
+    const cached = this.cache.get(blockIndex);
+    if (cached) return cached;
+    
+    const data = await this.inner.read(blockIndex);
+    this.cache.set(blockIndex, data);
+    return data;
+  }
+}
+```
+
+### Write Coalescing
+
+Multiple writes are batched into single IndexedDB transactions:
+
+```typescript
+class BatchingOverlay {
+  private pending = new Map<number, Uint8Array>();
+  private flushTimer: number | null = null;
+  
+  async write(blockIndex: number, data: Uint8Array): Promise<void> {
+    this.pending.set(blockIndex, data);
+    this.scheduleFlush();
+  }
+  
+  private scheduleFlush(): void {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => this.flush(), 100);
+  }
+  
+  private async flush(): Promise<void> {
+    const tx = this.db.transaction('blocks', 'readwrite');
+    for (const [index, data] of this.pending) {
+      tx.objectStore('blocks').put({ index, data });
+    }
+    await tx.done;
+    this.pending.clear();
+    this.flushTimer = null;
+  }
+}
+```
+
+## API Reference
+
+See the full API documentation:
+
+- [Block Device Types](/qemuweb/api/block-devices/)
+- [@qemuweb/storage Package](/qemuweb/packages/storage/)

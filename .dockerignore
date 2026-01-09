@@ -1,0 +1,25 @@
+# dependencies
+node_modules
+**/node_modules
+.pnpm-store
+
+# build outputs
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+.turbo
+**/.turbo
+
+# misc
+.DS_Store
+*.log
+
+# VCS
+.git
+.gitignore
+
+# editor
+.vscode

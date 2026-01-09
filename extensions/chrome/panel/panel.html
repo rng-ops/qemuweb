@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QemuWeb Panel</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div id="root">
+    <div class="header">
+      <h1>QemuWeb</h1>
+      <span class="status" id="status">Initializing...</span>
+    </div>
+
+    <div class="controls">
+      <div class="form-group">
+        <label for="profile">VM Profile</label>
+        <select id="profile">
+          <option value="">Select profile...</option>
+          <option value="linux-x86_64-pc-nographic">Linux x86_64 (No Graphics)</option>
+          <option value="linux-x86_64-pc-graphics">Linux x86_64 (VGA)</option>
+          <option value="linux-aarch64-virt-nographic">Linux aarch64 (No Graphics)</option>
+          <option value="minimal-x86_64">Minimal x86_64</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="disk">Disk Image</label>
+        <input type="file" id="disk" accept=".qcow2,.img,.raw,.iso">
+      </div>
+
+      <div class="actions">
+        <button id="start-btn" disabled>▶ Start VM</button>
+        <button id="stop-btn" disabled>■ Stop VM</button>
+      </div>
+    </div>
+
+    <div class="terminal-container">
+      <div id="terminal"></div>
+    </div>
+  </div>
+
+  <script type="module" src="panel.js"></script>
+</body>
+</html>

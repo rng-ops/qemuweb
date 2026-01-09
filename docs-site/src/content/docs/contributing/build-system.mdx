@@ -1,0 +1,424 @@
+---
+title: Build System
+description: Understanding the QemuWeb build system and toolchain
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+QemuWeb uses a modern monorepo build system with Turborepo for orchestration and multiple specialized build tools.
+
+## Overview
+
+<CardGrid>
+  <Card title="Turborepo" icon="rocket">
+    Orchestrates builds across packages with caching and parallelization.
+  </Card>
+  <Card title="tsup" icon="seti:typescript">
+    Bundles TypeScript packages for ESM distribution.
+  </Card>
+  <Card title="Vite" icon="seti:javascript">
+    Builds the web application with HMR and optimization.
+  </Card>
+  <Card title="Emscripten" icon="laptop">
+    Compiles QEMU to WebAssembly.
+  </Card>
+</CardGrid>
+
+## Turborepo Configuration
+
+The build system is defined in `turbo.json`:
+
+```json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "lint": {},
+    "typecheck": {
+      "dependsOn": ["^build"]
+    }
+  }
+}
+```
+
+### Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| `dependsOn: ["^build"]` | Build dependencies before this package |
+| `outputs` | Files to cache for incremental builds |
+| `cache: false` | Disable caching for dev servers |
+| `persistent: true` | Task runs continuously |
+
+### Dependency Graph
+
+Turborepo automatically builds packages in the correct order:
+
+```
+@qemuweb/storage
+         ↓
+@qemuweb/vm-config ──→ @qemuweb/runtime
+                                    ↓
+                           @qemuweb/web
+```
+
+## Package Builds
+
+### TypeScript Packages (tsup)
+
+Most packages use [tsup](https://tsup.egoist.dev/) for bundling:
+
+```json
+{
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "dev": "tsup src/index.ts --format esm --dts --watch"
+  }
+}
+```
+
+**tsup configuration** (`tsup.config.ts`):
+
+```typescript
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  entry: ['src/index.ts'],
+  format: ['esm'],
+  dts: true,
+  clean: true,
+  sourcemap: true,
+  target: 'es2022',
+  external: ['react', 'react-dom'],
+});
+```
+
+### Web Application (Vite)
+
+The web app uses [Vite](https://vitejs.dev/) with React:
+
+```typescript
+// apps/web/vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    target: 'esnext',
+    outDir: 'dist',
+  },
+  worker: {
+    format: 'es',
+  },
+  optimizeDeps: {
+    exclude: ['@qemuweb/runtime'],
+  },
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
+});
+```
+
+<Aside type="note">
+  The COOP/COEP headers are required for SharedArrayBuffer, which QEMU uses for shared memory.
+</Aside>
+
+## QEMU WebAssembly Build
+
+The most complex build is QEMU to WebAssembly.
+
+### Build Process
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Docker Container                      │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐ │
+│  │ Emscripten  │→ │ QEMU Source  │→ │ Configure +    │ │
+│  │ SDK         │  │ + Patches    │  │ Compile        │ │
+│  └─────────────┘  └──────────────┘  └────────────────┘ │
+│                           ↓                              │
+│  ┌─────────────────────────────────────────────────────┐│
+│  │ Output: qemu-system-*.wasm, qemu-system-*.js       ││
+│  └─────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+### Dockerfile
+
+```dockerfile
+FROM emscripten/emsdk:3.1.50
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    ninja-build \
+    pkg-config \
+    libglib2.0-dev \
+    python3 \
+    python3-pip
+
+# Copy QEMU source and patches
+COPY qemu-8.2.0.tar.xz /build/
+COPY patches/ /build/patches/
+COPY scripts/ /build/scripts/
+
+WORKDIR /build
+
+# Extract and patch
+RUN tar xf qemu-8.2.0.tar.xz && \
+    cd qemu-8.2.0 && \
+    for p in ../patches/*.patch; do patch -p1 < $p; done
+
+# Configure and build
+RUN cd qemu-8.2.0 && \
+    emconfigure ./configure \
+      --target-list=i386-softmmu \
+      --disable-werror \
+      --static \
+      --cross-prefix= && \
+    emmake make -j$(nproc)
+
+# Output
+CMD ["cp", "/build/qemu-8.2.0/build/qemu-system-i386", "/output/"]
+```
+
+### Build Scripts
+
+**config.sh** - Shared configuration:
+```bash
+#!/bin/bash
+export QEMU_VERSION="8.2.0"
+export EMSDK_VERSION="3.1.50"
+export TARGET="i386-softmmu"
+export MEMORY="256MB"
+```
+
+**configure-qemu.sh** - QEMU configuration:
+```bash
+#!/bin/bash
+source config.sh
+
+emconfigure ./configure \
+  --target-list=$TARGET \
+  --disable-werror \
+  --disable-pie \
+  --disable-sdl \
+  --disable-gtk \
+  --disable-vnc \
+  --disable-spice \
+  --enable-slirp \
+  --static
+```
+
+**compile-qemu.sh** - Compilation:
+```bash
+#!/bin/bash
+emmake make -j$(nproc)
+
+# Post-process WASM
+wasm-opt -O3 qemu-system-i386.wasm -o qemu-system-i386.opt.wasm
+```
+
+### Patches
+
+Custom patches in `packages/qemu-wasm/patches/`:
+
+| Patch | Purpose |
+|-------|---------|
+| `01-emscripten-support.patch` | Core Emscripten compatibility |
+| `02-disable-signalfd.patch` | Remove unsupported syscalls |
+| `03-virtio-browser.patch` | Browser-compatible virtio |
+| `04-slirp-tweaks.patch` | Networking optimizations |
+
+## Build Commands
+
+### Full Build
+
+```bash
+# Build all packages
+pnpm build
+
+# Build with verbose output
+pnpm build --verbose
+
+# Build specific package
+pnpm --filter @qemuweb/runtime build
+```
+
+### Incremental Build
+
+Turborepo caches builds for faster iteration:
+
+```bash
+# First build (full)
+pnpm build  # ~30 seconds
+
+# Second build (cached)
+pnpm build  # ~1 second (if no changes)
+```
+
+### Clean Build
+
+```bash
+# Remove all build artifacts
+pnpm clean
+
+# Remove node_modules too
+pnpm clean:all
+```
+
+## Build Outputs
+
+### Package Outputs
+
+| Package | Output | Contents |
+|---------|--------|----------|
+| `@qemuweb/runtime` | `dist/` | ESM bundle + types |
+| `@qemuweb/storage` | `dist/` | ESM bundle + types |
+| `@qemuweb/vm-config` | `dist/` | ESM bundle + types |
+| `@qemuweb/sidecar-proto` | `dist/` | ESM bundle + types |
+| `@qemuweb/qemu-wasm` | `dist/` | WASM + JS glue + data |
+| `@qemuweb/web` | `dist/` | Static web app |
+
+### Web App Bundle Analysis
+
+```bash
+# Generate bundle visualization
+pnpm --filter @qemuweb/web build -- --mode analyze
+
+# Output: dist/stats.html
+```
+
+## Continuous Integration
+
+### GitHub Actions Workflow
+
+```yaml
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          
+      - name: Install dependencies
+        run: pnpm install
+        
+      - name: Build
+        run: pnpm build
+        
+      - name: Test
+        run: pnpm test
+        
+      - name: Lint
+        run: pnpm lint
+```
+
+### Build Caching
+
+Turborepo remote caching (optional):
+
+```bash
+# Login to Vercel (for remote cache)
+pnpm turbo login
+
+# Link to team
+pnpm turbo link
+
+# Now builds cache remotely
+pnpm build
+```
+
+## Performance Optimization
+
+### Build Performance Tips
+
+1. **Use parallel builds**: Turborepo handles this automatically
+2. **Enable remote caching**: Reduces CI build times significantly
+3. **Exclude dev dependencies**: Use `--production` for Docker builds
+4. **Optimize WASM**: Use `wasm-opt -O3` for smaller binaries
+
+### Bundle Size Optimization
+
+```typescript
+// vite.config.ts
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'qemu-runtime': ['@qemuweb/runtime'],
+          'storage': ['@qemuweb/storage'],
+          'vendor': ['react', 'react-dom'],
+        },
+      },
+    },
+  },
+});
+```
+
+## Troubleshooting
+
+### Build Failures
+
+**TypeScript errors:**
+```bash
+# Check types across all packages
+pnpm typecheck
+
+# Fix: Ensure dependencies are built first
+pnpm build --force
+```
+
+**Memory issues:**
+```bash
+export NODE_OPTIONS="--max-old-space-size=8192"
+pnpm build
+```
+
+**Cache issues:**
+```bash
+# Clear Turborepo cache
+rm -rf .turbo
+pnpm build
+```
+
+### QEMU WASM Build Issues
+
+**Docker memory:**
+```bash
+# Increase Docker memory to 8GB+
+docker run --memory=8g -v $(pwd)/dist:/output qemu-wasm-builder
+```
+
+**Emscripten version mismatch:**
+```bash
+# Ensure correct version in Dockerfile
+FROM emscripten/emsdk:3.1.50
+```

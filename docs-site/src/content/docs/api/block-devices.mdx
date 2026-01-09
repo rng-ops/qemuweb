@@ -1,0 +1,589 @@
+---
+title: Block Devices API
+description: API reference for storage block device interfaces
+---
+
+import { Aside, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Block devices provide the storage abstraction layer for virtual machines. This page documents all block device types and their APIs.
+
+## BlockDevice Interface
+
+All block devices implement this base interface:
+
+```typescript
+interface BlockDevice {
+  readonly size: number;
+  readonly blockSize: number;
+  readonly ready: boolean;
+  
+  read(offset: number, length: number): Promise<Uint8Array>;
+  write(offset: number, data: Uint8Array): Promise<void>;
+  flush(): Promise<void>;
+  close(): Promise<void>;
+}
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `size` | `number` | Total size of the device in bytes |
+| `blockSize` | `number` | Block size (typically 512 or 4096) |
+| `ready` | `boolean` | Whether the device is ready for I/O |
+
+### Methods
+
+#### read()
+
+<Badge text="async" variant="tip" />
+
+Read data from the device.
+
+```typescript
+async read(offset: number, length: number): Promise<Uint8Array>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `offset` | `number` | Byte offset to read from |
+| `length` | `number` | Number of bytes to read |
+
+#### write()
+
+<Badge text="async" variant="tip" />
+
+Write data to the device.
+
+```typescript
+async write(offset: number, data: Uint8Array): Promise<void>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `offset` | `number` | Byte offset to write to |
+| `data` | `Uint8Array` | Data to write |
+
+#### flush()
+
+<Badge text="async" variant="tip" />
+
+Flush pending writes to storage.
+
+```typescript
+async flush(): Promise<void>
+```
+
+#### close()
+
+<Badge text="async" variant="tip" />
+
+Close the device and release resources.
+
+```typescript
+async close(): Promise<void>
+```
+
+---
+
+## HttpBlockDevice
+
+Provides read-only access to disk images served over HTTP with range request support.
+
+```typescript
+import { HttpBlockDevice } from '@qemuweb/storage';
+```
+
+### Constructor
+
+```typescript
+new HttpBlockDevice(url: string, options?: HttpBlockDeviceOptions)
+```
+
+#### HttpBlockDeviceOptions
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `size` | `number` | Yes | - | Total size in bytes |
+| `blockSize` | `number` | No | `512` | Block size in bytes |
+| `cacheSize` | `number` | No | `16MB` | LRU cache size |
+| `headers` | `Record<string, string>` | No | `{}` | Custom HTTP headers |
+| `credentials` | `RequestCredentials` | No | `'omit'` | Fetch credentials mode |
+
+### Example
+
+```typescript
+const disk = new HttpBlockDevice(
+  'https://cdn.example.com/alpine-linux.qcow2',
+  {
+    size: 512 * 1024 * 1024, // 512MB
+    cacheSize: 32 * 1024 * 1024, // 32MB cache
+    headers: {
+      'Authorization': 'Bearer token123',
+    },
+  }
+);
+
+// Read boot sector
+const bootSector = await disk.read(0, 512);
+```
+
+### Features
+
+- **Range requests**: Only fetches requested data
+- **LRU caching**: Caches recently accessed blocks
+- **Prefetching**: Predictive read-ahead
+- **CORS support**: Works cross-origin
+
+<Aside type="note">
+  HttpBlockDevice is read-only. Use with COWBlockDevice to enable writes.
+</Aside>
+
+---
+
+## FileBlockDevice
+
+Provides access to local files via File System Access API.
+
+```typescript
+import { FileBlockDevice } from '@qemuweb/storage';
+```
+
+### Constructor
+
+```typescript
+new FileBlockDevice(handle: FileSystemFileHandle, options?: FileBlockDeviceOptions)
+```
+
+#### FileBlockDeviceOptions
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `blockSize` | `number` | No | `512` | Block size in bytes |
+| `writable` | `boolean` | No | `true` | Enable write access |
+
+### Factory Methods
+
+#### fromFile()
+
+<Badge text="async" variant="tip" />
+<Badge text="static" variant="note" />
+
+Create from a File object.
+
+```typescript
+static async fromFile(file: File): Promise<FileBlockDevice>
+```
+
+#### fromPicker()
+
+<Badge text="async" variant="tip" />
+<Badge text="static" variant="note" />
+
+Create using file picker dialog.
+
+```typescript
+static async fromPicker(options?: OpenFilePickerOptions): Promise<FileBlockDevice>
+```
+
+### Example
+
+<Tabs>
+  <TabItem label="File Picker">
+```typescript
+// Show file picker
+const disk = await FileBlockDevice.fromPicker({
+  types: [
+    {
+      description: 'Disk Images',
+      accept: { 'application/octet-stream': ['.qcow2', '.img', '.raw'] },
+    },
+  ],
+});
+
+console.log(`Loaded disk: ${disk.size} bytes`);
+```
+  </TabItem>
+  <TabItem label="From Handle">
+```typescript
+// From existing handle
+const [handle] = await window.showOpenFilePicker();
+const disk = new FileBlockDevice(handle);
+
+await disk.ready;
+const data = await disk.read(0, 4096);
+```
+  </TabItem>
+  <TabItem label="Drag & Drop">
+```typescript
+element.addEventListener('drop', async (e) => {
+  const item = e.dataTransfer!.items[0];
+  const handle = await item.getAsFileSystemHandle() as FileSystemFileHandle;
+  const disk = new FileBlockDevice(handle);
+});
+```
+  </TabItem>
+</Tabs>
+
+---
+
+## COWBlockDevice
+
+Copy-on-Write wrapper that enables writes on read-only devices.
+
+```typescript
+import { COWBlockDevice } from '@qemuweb/storage';
+```
+
+### Constructor
+
+```typescript
+new COWBlockDevice(base: BlockDevice, overlay: Overlay)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `base` | `BlockDevice` | Read-only base device |
+| `overlay` | `Overlay` | Storage for modifications |
+
+### Overlay Interface
+
+```typescript
+interface Overlay {
+  has(offset: number): boolean;
+  get(offset: number): Uint8Array | undefined;
+  set(offset: number, data: Uint8Array): void;
+  delete(offset: number): void;
+  clear(): void;
+  keys(): IterableIterator<number>;
+}
+```
+
+### Example
+
+```typescript
+const base = new HttpBlockDevice('https://cdn.example.com/base.qcow2', {
+  size: 1024 * 1024 * 1024,
+});
+
+const overlay = new IndexedDBOverlay('my-vm-disk');
+const cow = new COWBlockDevice(base, overlay);
+
+// Reads go to base (if not modified)
+const data = await cow.read(0, 512);
+
+// Writes go to overlay
+await cow.write(0, new Uint8Array(512).fill(0xAB));
+
+// Subsequent reads see the write
+const modified = await cow.read(0, 512);
+// modified[0] === 0xAB
+```
+
+### Methods
+
+#### getModifiedBlocks()
+
+Get list of modified block offsets.
+
+```typescript
+getModifiedBlocks(): number[]
+```
+
+#### getDirtySize()
+
+Get total size of modifications.
+
+```typescript
+getDirtySize(): number
+```
+
+#### resetOverlay()
+
+Clear all modifications (revert to base).
+
+```typescript
+async resetOverlay(): Promise<void>
+```
+
+---
+
+## IndexedDBOverlay
+
+Persistent overlay storage using IndexedDB.
+
+```typescript
+import { IndexedDBOverlay } from '@qemuweb/storage';
+```
+
+### Constructor
+
+```typescript
+new IndexedDBOverlay(name: string, options?: IndexedDBOverlayOptions)
+```
+
+#### IndexedDBOverlayOptions
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `dbName` | `string` | No | `'qemuweb'` | IndexedDB database name |
+| `storeName` | `string` | No | `'blocks'` | Object store name |
+| `writeBuffer` | `number` | No | `1000` | Buffer before flush |
+
+### Example
+
+```typescript
+const overlay = new IndexedDBOverlay('my-vm', {
+  dbName: 'qemuweb-storage',
+  writeBuffer: 500,
+});
+
+// Used with COWBlockDevice
+const disk = new COWBlockDevice(baseDisk, overlay);
+
+// Writes automatically persist to IndexedDB
+await disk.write(0, data);
+
+// On page reload, modifications are preserved
+```
+
+### Methods
+
+#### clear()
+
+<Badge text="async" variant="tip" />
+
+Clear all stored modifications.
+
+```typescript
+async clear(): Promise<void>
+```
+
+#### getSize()
+
+<Badge text="async" variant="tip" />
+
+Get total persisted size.
+
+```typescript
+async getSize(): Promise<number>
+```
+
+#### export()
+
+<Badge text="async" variant="tip" />
+
+Export all modifications as a blob.
+
+```typescript
+async export(): Promise<Blob>
+```
+
+#### import()
+
+<Badge text="async" variant="tip" />
+
+Import modifications from a blob.
+
+```typescript
+async import(data: Blob): Promise<void>
+```
+
+---
+
+## MemoryOverlay
+
+In-memory overlay (non-persistent).
+
+```typescript
+import { MemoryOverlay } from '@qemuweb/storage';
+```
+
+### Constructor
+
+```typescript
+new MemoryOverlay(options?: MemoryOverlayOptions)
+```
+
+#### MemoryOverlayOptions
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `maxSize` | `number` | No | `256MB` | Maximum memory usage |
+
+### Example
+
+```typescript
+const overlay = new MemoryOverlay({ maxSize: 128 * 1024 * 1024 });
+const disk = new COWBlockDevice(baseDisk, overlay);
+
+// Modifications are lost on page reload
+```
+
+---
+
+## AtlasStore
+
+High-level storage abstraction for managing multiple disk images with chunk-based deduplication.
+
+```typescript
+import { AtlasStore } from '@qemuweb/storage';
+```
+
+### Constructor
+
+```typescript
+new AtlasStore(options?: AtlasStoreOptions)
+```
+
+#### AtlasStoreOptions
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `dbName` | `string` | No | `'atlas'` | Database name |
+| `chunkSize` | `number` | No | `4096` | Chunk size in bytes |
+| `compressionLevel` | `number` | No | `6` | Compression level (0-9) |
+
+### Methods
+
+#### createImage()
+
+<Badge text="async" variant="tip" />
+
+Create a new disk image.
+
+```typescript
+async createImage(name: string, size: number): Promise<AtlasImage>
+```
+
+#### openImage()
+
+<Badge text="async" variant="tip" />
+
+Open an existing image.
+
+```typescript
+async openImage(name: string): Promise<AtlasImage>
+```
+
+#### deleteImage()
+
+<Badge text="async" variant="tip" />
+
+Delete an image.
+
+```typescript
+async deleteImage(name: string): Promise<void>
+```
+
+#### listImages()
+
+<Badge text="async" variant="tip" />
+
+List all images.
+
+```typescript
+async listImages(): Promise<AtlasImageInfo[]>
+```
+
+### AtlasImage
+
+AtlasImage implements the BlockDevice interface plus:
+
+```typescript
+interface AtlasImage extends BlockDevice {
+  readonly name: string;
+  readonly createdAt: Date;
+  readonly modifiedAt: Date;
+  
+  fork(newName: string): Promise<AtlasImage>;
+  getStats(): AtlasStats;
+}
+```
+
+### Example
+
+```typescript
+const store = new AtlasStore();
+
+// Create base image
+const base = await store.createImage('alpine-base', 512 * 1024 * 1024);
+
+// Fork for a VM instance
+const instance = await base.fork('alpine-vm-1');
+
+// Use as block device
+await client.start({
+  blockDevices: [instance],
+});
+
+// Check deduplication stats
+const stats = store.getStats();
+console.log(`Dedup ratio: ${stats.deduplicationRatio}`);
+```
+
+---
+
+## Usage Patterns
+
+### Pattern: Read-Only HTTP with Local Changes
+
+```typescript
+import { HttpBlockDevice, COWBlockDevice, IndexedDBOverlay } from '@qemuweb/storage';
+
+async function createDisk(imageUrl: string, vmId: string) {
+  const base = new HttpBlockDevice(imageUrl, {
+    size: await getImageSize(imageUrl),
+  });
+  
+  const overlay = new IndexedDBOverlay(vmId);
+  return new COWBlockDevice(base, overlay);
+}
+```
+
+### Pattern: Multiple Disks
+
+```typescript
+const bootDisk = new HttpBlockDevice(bootUrl, { size: bootSize });
+const dataDisk = await FileBlockDevice.fromPicker();
+
+await client.start({
+  blockDevices: [bootDisk, dataDisk],
+  cmdline: 'root=/dev/vda',
+});
+```
+
+### Pattern: Export Changes
+
+```typescript
+const overlay = cow.overlay as IndexedDBOverlay;
+const changes = await overlay.export();
+
+// Download as file
+const url = URL.createObjectURL(changes);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'disk-changes.bin';
+a.click();
+```
+
+---
+
+## TypeScript Types
+
+```typescript
+import type {
+  BlockDevice,
+  HttpBlockDevice,
+  HttpBlockDeviceOptions,
+  FileBlockDevice,
+  FileBlockDeviceOptions,
+  COWBlockDevice,
+  Overlay,
+  IndexedDBOverlay,
+  MemoryOverlay,
+  AtlasStore,
+  AtlasImage,
+  AtlasStats,
+} from '@qemuweb/storage';
+```

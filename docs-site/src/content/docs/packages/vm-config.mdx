@@ -1,0 +1,368 @@
+---
+title: "@qemuweb/vm-config"
+description: VM profiles, network configuration, and container specifications
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+The `@qemuweb/vm-config` package provides configuration types, pre-built VM profiles, and builders for creating custom virtual machine setups.
+
+## Installation
+
+```bash
+pnpm add @qemuweb/vm-config
+```
+
+## Exports
+
+```typescript
+import {
+  // Pre-built profiles
+  profiles,
+  
+  // Builders
+  VmBuilder,
+  NetworkBuilder,
+  TopologyBuilder,
+  
+  // Types
+  type VmProfile,
+  type VmConfig,
+  type NetworkConfig,
+  type NicConfig,
+  
+  // Registries
+  ImageRegistry,
+  ProfileRegistry,
+} from '@qemuweb/vm-config';
+```
+
+## Pre-built Profiles
+
+Ready-to-use VM configurations:
+
+```typescript
+import { profiles } from '@qemuweb/vm-config';
+
+// Available profiles
+profiles.alpineLinux      // Minimal Alpine Linux
+profiles.alpineRouter     // BusyBox-based router
+profiles.devContainer     // Development environment
+profiles.vault            // HashiCorp Vault
+```
+
+### Profile Details
+
+| Profile | RAM | Disk | Use Case |
+|---------|-----|------|----------|
+| `alpineLinux` | 128MB | 128MB | General purpose Linux |
+| `alpineRouter` | 64MB | 32MB | Network routing |
+| `devContainer` | 256MB | 256MB | Development |
+| `vault` | 128MB | 64MB | Secrets management |
+
+### Using a Profile
+
+```typescript
+import { QemuClient } from '@qemuweb/runtime';
+import { profiles } from '@qemuweb/vm-config';
+
+const client = new QemuClient({ /* config */ });
+await client.start(profiles.alpineLinux);
+```
+
+## VmProfile Type
+
+```typescript
+interface VmProfile {
+  name: string;
+  description?: string;
+  
+  // Hardware
+  arch: 'x86_64' | 'aarch64' | 'riscv64';
+  memory: number;          // RAM in MB
+  cpus?: number;           // Virtual CPUs (default: 1)
+  
+  // Boot
+  kernelUrl?: string;      // Direct kernel boot
+  initrdUrl?: string;      // Initial ramdisk
+  cmdline?: string;        // Kernel command line
+  
+  // Storage
+  diskUrl?: string;        // Root filesystem image
+  diskSize?: number;       // Size in bytes
+  
+  // Network
+  network?: NetworkConfig;
+  
+  // Features
+  features?: {
+    kvm?: boolean;         // KVM acceleration (not available in browser)
+    graphics?: boolean;    // VGA output
+    audio?: boolean;       // Audio device
+  };
+}
+```
+
+## VmBuilder
+
+Fluent API for creating custom VM configurations:
+
+```typescript
+import { VmBuilder } from '@qemuweb/vm-config';
+
+const vm = new VmBuilder()
+  .name('my-custom-vm')
+  .description('A custom Alpine VM')
+  .arch('x86_64')
+  .memory(256)
+  .cpus(2)
+  .kernel('/images/vmlinuz')
+  .initrd('/images/initramfs.img')
+  .cmdline('console=ttyS0 root=/dev/vda rw')
+  .disk('/images/rootfs.bin', 256 * 1024 * 1024)
+  .build();
+```
+
+### Builder Methods
+
+```typescript
+class VmBuilder {
+  name(name: string): this;
+  description(desc: string): this;
+  arch(arch: 'x86_64' | 'aarch64' | 'riscv64'): this;
+  memory(mb: number): this;
+  cpus(count: number): this;
+  kernel(url: string): this;
+  initrd(url: string): this;
+  cmdline(cmd: string): this;
+  disk(url: string, size: number): this;
+  nic(config: NicConfig): this;
+  feature(name: string, enabled: boolean): this;
+  build(): VmProfile;
+}
+```
+
+### Extending Profiles
+
+```typescript
+const customAlpine = new VmBuilder()
+  .fromProfile(profiles.alpineLinux)  // Start from existing
+  .memory(512)                         // Override RAM
+  .nic({ network: 'internal' })        // Add networking
+  .build();
+```
+
+## Network Configuration
+
+### NetworkConfig Type
+
+```typescript
+interface NetworkConfig {
+  type: 'nat' | 'internal' | 'routed' | 'bridged';
+  name: string;
+  cidr: string;
+  gateway?: string;
+  dhcp?: {
+    enabled: boolean;
+    start?: string;
+    end?: string;
+  };
+  dns?: string[];
+}
+```
+
+### NetworkBuilder
+
+```typescript
+import { NetworkBuilder } from '@qemuweb/vm-config';
+
+const network = new NetworkBuilder()
+  .name('management')
+  .type('nat')
+  .cidr('10.0.0.0/24')
+  .gateway('10.0.0.1')
+  .dhcp({ start: '10.0.0.10', end: '10.0.0.200' })
+  .dns(['10.0.0.1', '8.8.8.8'])
+  .build();
+```
+
+### NIC Configuration
+
+```typescript
+interface NicConfig {
+  network: string;         // Network name
+  mac?: string;           // MAC address (auto-generated if omitted)
+  ip?: string;            // Static IP (uses DHCP if omitted)
+  model?: 'virtio' | 'e1000' | 'rtl8139';
+}
+```
+
+### Multi-NIC Example
+
+```typescript
+const webServer = new VmBuilder()
+  .fromProfile(profiles.alpineLinux)
+  .name('web-server')
+  .nic({
+    network: 'dmz',
+    ip: '172.16.0.10',
+  })
+  .nic({
+    network: 'backend',
+    ip: '192.168.100.10',
+  })
+  .build();
+```
+
+## TopologyBuilder
+
+Create complete network topologies with multiple VMs:
+
+```typescript
+import { TopologyBuilder } from '@qemuweb/vm-config';
+
+const lab = new TopologyBuilder()
+  // Networks
+  .network({
+    name: 'wan',
+    type: 'nat',
+    cidr: '10.0.0.0/24',
+  })
+  .network({
+    name: 'lan',
+    type: 'internal',
+    cidr: '192.168.1.0/24',
+  })
+  
+  // Router
+  .vm({
+    name: 'router',
+    profile: 'alpineRouter',
+    nics: [
+      { network: 'wan', ip: '10.0.0.1' },
+      { network: 'lan', ip: '192.168.1.1' },
+    ],
+  })
+  
+  // Clients
+  .vm({
+    name: 'client-1',
+    profile: 'alpineLinux',
+    nics: [{ network: 'lan' }],  // DHCP
+  })
+  .vm({
+    name: 'client-2',
+    profile: 'alpineLinux',
+    nics: [{ network: 'lan' }],
+  })
+  
+  .build();
+
+// Start the topology
+for (const vm of lab.vms) {
+  await startVm(vm);
+}
+```
+
+## Image Registry
+
+Manage disk images and their metadata:
+
+```typescript
+import { ImageRegistry } from '@qemuweb/vm-config';
+
+const registry = new ImageRegistry();
+
+// Register an image
+registry.register({
+  id: 'alpine-3.19',
+  name: 'Alpine Linux 3.19',
+  url: 'https://cdn.example.com/alpine-3.19-rootfs.bin',
+  size: 134217728,
+  sha256: 'abc123...',
+  metadata: {
+    os: 'linux',
+    version: '3.19',
+  },
+});
+
+// Get image info
+const image = registry.get('alpine-3.19');
+
+// List all images
+const images = registry.list();
+```
+
+## Container Configuration
+
+Docker-like container definitions for MCP:
+
+```typescript
+import { ContainerConfig } from '@qemuweb/vm-config';
+
+const container: ContainerConfig = {
+  name: 'web-server',
+  image: 'alpine:3.19',
+  ports: [
+    { host: 8080, container: 80 },
+  ],
+  environment: {
+    NODE_ENV: 'production',
+  },
+  volumes: [
+    { host: '/data', container: '/app/data' },
+  ],
+  resources: {
+    memory: '128m',
+    cpus: 1,
+  },
+};
+```
+
+## Terraform-like Infrastructure
+
+Define infrastructure as code:
+
+```typescript
+import { InfrastructureBuilder } from '@qemuweb/vm-config';
+
+const infra = new InfrastructureBuilder()
+  .provider('qemuweb')
+  
+  .resource('network', 'main', {
+    type: 'nat',
+    cidr: '10.0.0.0/24',
+  })
+  
+  .resource('vm', 'web', {
+    profile: 'alpineLinux',
+    network: '${network.main.name}',
+    count: 3,
+  })
+  
+  .output('web_ips', '${vm.web.*.ip}')
+  
+  .build();
+```
+
+## Validation
+
+All configurations are validated at build time:
+
+```typescript
+try {
+  const vm = new VmBuilder()
+    .memory(-100)  // Invalid!
+    .build();
+} catch (e) {
+  console.error(e.message);
+  // "memory must be a positive number"
+}
+```
+
+## Source Code
+
+- [packages/vm-config/src/types.ts](https://github.com/user/qemuweb/blob/main/packages/vm-config/src/types.ts)
+- [packages/vm-config/src/profiles.ts](https://github.com/user/qemuweb/blob/main/packages/vm-config/src/profiles.ts)
+- [packages/vm-config/src/builder.ts](https://github.com/user/qemuweb/blob/main/packages/vm-config/src/builder.ts)
+- [packages/vm-config/src/networking.ts](https://github.com/user/qemuweb/blob/main/packages/vm-config/src/networking.ts)

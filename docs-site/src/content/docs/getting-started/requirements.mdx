@@ -1,0 +1,218 @@
+---
+title: Browser Requirements
+description: Browser compatibility and required features for running QemuWeb
+---
+
+import { Aside, Badge } from '@astrojs/starlight/components';
+
+QemuWeb requires specific browser features to function. This page explains what's needed and how to ensure compatibility.
+
+## Required Features
+
+### WebAssembly
+
+<Badge text="Required" variant="danger" />
+
+WebAssembly (WASM) is the core technology that allows QEMU to run in the browser. All modern browsers support WebAssembly.
+
+| Browser | Minimum Version |
+|---------|-----------------|
+| Chrome | 57+ |
+| Firefox | 52+ |
+| Safari | 11+ |
+| Edge | 16+ |
+
+### SharedArrayBuffer
+
+<Badge text="Required" variant="danger" />
+
+SharedArrayBuffer enables multi-threaded WebAssembly execution, which is essential for QEMU's performance. This feature was disabled by default after the Spectre vulnerability but can be re-enabled with proper headers.
+
+<Aside type="caution" title="Cross-Origin Isolation Required">
+  SharedArrayBuffer only works when the page is cross-origin isolated. Your server must send specific HTTP headers.
+</Aside>
+
+#### Required HTTP Headers
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+In the QemuWeb web app, these are configured in [apps/web/public/_headers](https://github.com/user/qemuweb/blob/main/apps/web/public/_headers):
+
+```plaintext
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+```
+
+### IndexedDB
+
+<Badge text="Required" variant="danger" />
+
+IndexedDB is used for persistent storage of VM disk images. All modern browsers support IndexedDB with adequate storage limits.
+
+| Browser | Storage Limit |
+|---------|---------------|
+| Chrome | Up to 80% of disk |
+| Firefox | Up to 50% of disk |
+| Safari | 1GB (prompts for more) |
+| Edge | Up to 80% of disk |
+
+### Web Workers
+
+<Badge text="Required" variant="danger" />
+
+Web Workers provide the isolated execution environment for QEMU. The VM runs entirely within a Worker, keeping the main thread responsive.
+
+## Browser Compatibility Matrix
+
+| Feature | Chrome | Firefox | Safari | Edge |
+|---------|--------|---------|--------|------|
+| WebAssembly | ✅ 57+ | ✅ 52+ | ✅ 11+ | ✅ 16+ |
+| SharedArrayBuffer | ✅ 91+ | ✅ 79+ | ✅ 15.2+ | ✅ 91+ |
+| IndexedDB | ✅ | ✅ | ✅ | ✅ |
+| Web Workers | ✅ | ✅ | ✅ | ✅ |
+
+<Aside type="tip">
+  For the best experience, use the latest version of Chrome or Firefox.
+</Aside>
+
+## Checking Capabilities at Runtime
+
+QemuWeb automatically checks browser capabilities when the worker starts. You can handle this in your code:
+
+```typescript
+import { QemuClient } from '@qemuweb/runtime';
+
+const client = new QemuClient({ /* config */ });
+
+client.on('capabilities', (caps) => {
+  console.log('SharedArrayBuffer:', caps.sharedArrayBuffer);
+  console.log('Cross-Origin Isolated:', caps.crossOriginIsolated);
+  console.log('Atomics:', caps.atomics);
+  
+  if (!caps.crossOriginIsolated) {
+    alert('Please configure COOP/COEP headers on your server');
+  }
+});
+```
+
+### Capability Object
+
+```typescript
+interface BrowserCapabilities {
+  // Core requirements
+  sharedArrayBuffer: boolean;
+  crossOriginIsolated: boolean;
+  atomics: boolean;
+  
+  // Storage
+  indexedDB: boolean;
+  storageEstimate: {
+    quota: number;    // Total available bytes
+    usage: number;    // Currently used bytes
+  };
+  
+  // Optional features
+  webgl: boolean;     // For future graphics support
+  simd: boolean;      // WASM SIMD for performance
+}
+```
+
+## Troubleshooting
+
+### "SharedArrayBuffer is not defined"
+
+This error means your page is not cross-origin isolated. Solutions:
+
+1. **Development**: Use Vite's dev server which sets headers automatically
+2. **Production**: Configure your server/CDN to send the required headers
+3. **Static hosting**: Use a `_headers` file (Netlify, Cloudflare Pages) or configure in your hosting dashboard
+
+### "SecurityError: Failed to construct 'Worker'"
+
+This usually means the worker script URL is blocked by CORS. Ensure:
+- The worker script is served from the same origin
+- Or configure CORS headers on the worker script
+
+### "QuotaExceededError" in IndexedDB
+
+The browser's storage quota is full. Solutions:
+- Clear site data in browser settings
+- Request persistent storage: `navigator.storage.persist()`
+- Use smaller disk images
+
+### Poor Performance
+
+If the VM runs slowly:
+1. Ensure you're using a Chromium-based browser (best WASM performance)
+2. Close other tabs to free memory
+3. Check if SIMD is available: `WebAssembly.validate(simdTestBytes)`
+4. Reduce VM memory allocation in the profile
+
+## Server Configuration Examples
+
+### Nginx
+
+```nginx
+server {
+    location / {
+        add_header Cross-Origin-Opener-Policy same-origin;
+        add_header Cross-Origin-Embedder-Policy require-corp;
+    }
+}
+```
+
+### Apache
+
+```apache
+<IfModule mod_headers.c>
+    Header set Cross-Origin-Opener-Policy "same-origin"
+    Header set Cross-Origin-Embedder-Policy "require-corp"
+</IfModule>
+```
+
+### Cloudflare Pages / Netlify
+
+Create a `_headers` file in your public directory:
+
+```plaintext
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+```
+
+### Vercel
+
+Add to `vercel.json`:
+
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+      ]
+    }
+  ]
+}
+```
+
+## Mobile Browser Support
+
+<Aside type="note">
+  Mobile browser support is experimental. Performance may vary significantly.
+</Aside>
+
+| Platform | Browser | Status |
+|----------|---------|--------|
+| iOS | Safari | ⚠️ Limited (memory constraints) |
+| iOS | Chrome | ❌ Uses Safari's engine |
+| Android | Chrome | ✅ Works (recent devices) |
+| Android | Firefox | ✅ Works (recent devices) |
+
+Mobile devices have limited RAM, so use profiles with lower memory allocations (64-128MB) for best results.
