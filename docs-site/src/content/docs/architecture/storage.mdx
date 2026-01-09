@@ -10,7 +10,7 @@ QemuWeb's storage system provides persistent, efficient virtual disk storage usi
 ## Storage Architecture
 
 <div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
-  <img src="/qemuweb/diagrams/02-cow-storage.svg" alt="Copy-on-Write Storage" style="width: 100%; height: auto;" />
+  <img src="/diagrams/02-cow-storage.svg" alt="Copy-on-Write Storage" style="width: 100%; height: auto;" />
 </div>
 
 The storage system consists of three main layers:
@@ -50,7 +50,7 @@ interface BlockDevice {
 ### 3. Atlas Store (Content-Addressed)
 
 <div style="background: var(--sl-color-gray-6); border-radius: 1rem; padding: 1rem; margin: 2rem 0;">
-  <img src="/qemuweb/diagrams/05-atlas-store.svg" alt="Atlas Store" style="width: 100%; height: auto;" />
+  <img src="/diagrams/05-atlas-store.svg" alt="Atlas Store" style="width: 100%; height: auto;" />
 </div>
 
 The Atlas Store provides content-addressed storage with deduplication:

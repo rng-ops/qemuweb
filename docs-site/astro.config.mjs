@@ -5,7 +5,7 @@ import tailwind from '@astrojs/tailwind';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://qemuweb.github.io',
+	site: 'https://rng-ops.github.io',
 	base: '/qemuweb',
 	integrations: [
 		starlight({
@@ -16,7 +16,7 @@ export default defineConfig({
 				replacesTitle: false,
 			},
 			social: [
-				{ icon: 'github', label: 'GitHub', href: 'https://github.com/user/qemuweb' },
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/rng-ops/qemuweb' },
 			],
 			customCss: [
 				'./src/styles/custom.css',
@@ -30,7 +30,7 @@ export default defineConfig({
 					tag: 'meta',
 					attrs: {
 						property: 'og:image',
-						content: 'https://qemuweb.github.io/qemuweb/og-image.png',
+						content: 'https://rng-ops.github.io/qemuweb/og-image.png',
 					},
 				},
 				{
@@ -50,7 +50,7 @@ export default defineConfig({
 				},
 			],
 			editLink: {
-				baseUrl: 'https://github.com/user/qemuweb/edit/main/docs-site/',
+				baseUrl: 'https://github.com/rng-ops/qemuweb/edit/main/docs-site/',
 			},
 			sidebar: [
 				{
