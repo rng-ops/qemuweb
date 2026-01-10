@@ -109,7 +109,7 @@ jobs:
   # ============================================
   build-qemu-wasm:
     name: Build QEMU WASM
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm  # ARM runner for faster builds
     # Run on manual dispatch, [build-qemu] tag, or when qemu-wasm package changes
     if: |
       github.event_name == 'workflow_dispatch' || 
