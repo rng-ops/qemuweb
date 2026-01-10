@@ -638,7 +638,6 @@ Keep it concise (1-2 sentences). Be authentic in your reasoning.`;
   // ============ Context Building ============
 
   async getContext(): Promise<AtlasContext> {
-    const domObserver = getDOMObserver();
     const memoryStore = await getMemoryStore();
     
     const [activeMemories, patterns] = await Promise.all([

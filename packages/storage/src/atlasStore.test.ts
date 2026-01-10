@@ -5,7 +5,7 @@
  * In Node.js, use fake-indexeddb or run in a browser test environment.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   hashBlob,
   generateId,

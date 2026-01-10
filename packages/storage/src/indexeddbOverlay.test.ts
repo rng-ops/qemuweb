@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
+import { indexedDB } from 'fake-indexeddb';
 import { IndexedDBOverlay } from '../src/indexeddbOverlay.js';
 
 describe('IndexedDBOverlay', () => {
@@ -14,7 +15,15 @@ describe('IndexedDBOverlay', () => {
   });
 
   afterEach(async () => {
+    await overlay.clear();
     await overlay.close();
+    // Delete all IndexedDB databases to ensure clean state
+    const databases = await indexedDB.databases();
+    for (const db of databases) {
+      if (db.name) {
+        indexedDB.deleteDatabase(db.name);
+      }
+    }
   });
 
   it('should initialize without error', async () => {
