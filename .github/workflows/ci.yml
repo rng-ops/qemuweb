@@ -191,6 +191,14 @@ jobs:
       - name: Build all packages
         run: pnpm build
 
+      - name: Build docs site
+        run: pnpm --filter docs-site build
+
+      - name: Copy docs into web app
+        run: |
+          mkdir -p apps/web/dist/docs
+          cp -r docs-site/dist/* apps/web/dist/docs/
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

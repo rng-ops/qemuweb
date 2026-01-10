@@ -6,7 +6,7 @@ import tailwind from '@astrojs/tailwind';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://rng-ops.github.io',
-	base: '/qemuweb',
+	base: '/qemuweb/docs',
 	integrations: [
 		starlight({
 			title: 'QemuWeb',

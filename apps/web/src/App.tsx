@@ -7,6 +7,7 @@ import { ApprovalWorkflowProvider } from './components/approval/ApprovalWorkflow
 import { AtlasFrame } from './components/agent/AtlasFrame';
 import { OllamaManager } from './components/ollama/OllamaManager';
 import { InternalBrowser } from './components/browser/InternalBrowser';
+import { DocsView } from './components/docs/DocsView';
 import { getEventTracker } from './services/eventTracker';
 import { getMemoryStore } from './services/vectorMemory';
 import { getAuditLog } from './services/auditLog';
@@ -22,7 +23,7 @@ import { CapabilityWarnings } from './components/CapabilityWarnings';
 import { useQemuClient } from './hooks/useQemuClient';
 import type { VmProfile, VmInputs, VmOverrides } from '@qemuweb/vm-config';
 
-type AppMode = 'dashboard' | 'ide' | 'vm' | 'network' | 'browser' | 'ollama';
+type AppMode = 'dashboard' | 'ide' | 'vm' | 'network' | 'browser' | 'ollama' | 'docs';
 
 function App() {
   const [mode, setMode] = useState<AppMode>('dashboard');
@@ -71,7 +72,7 @@ function App() {
   useEffect(() => {
     const handleAgentNav = (event: CustomEvent<{ view: string }>) => {
       const view = event.detail.view as AppMode;
-      if (['dashboard', 'ide', 'vm', 'network', 'browser', 'ollama'].includes(view)) {
+      if (['dashboard', 'ide', 'vm', 'network', 'browser', 'ollama', 'docs'].includes(view)) {
         setMode(view);
       }
     };
@@ -155,6 +156,12 @@ function App() {
                 className={getNavButtonClass('ollama')}
               >
                 Ollama
+              </button>
+              <button
+                onClick={() => setMode('docs')}
+                className={getNavButtonClass('docs')}
+              >
+                📚 Docs
               </button>
             </nav>
           </div>
@@ -371,6 +378,16 @@ function App() {
         </header>
         <main className="flex-1 overflow-hidden min-h-0">
           <OllamaManager />
+        </main>
+      </AppShell>
+    );
+  }
+
+  if (mode === 'docs') {
+    return (
+      <AppShell>
+        <main className="flex-1 overflow-hidden min-h-0">
+          <DocsView />
         </main>
       </AppShell>
     );
