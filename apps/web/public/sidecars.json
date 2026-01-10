@@ -1,0 +1,52 @@
+{
+  "latestVersion": "0.1.0",
+  "versions": [
+    {
+      "version": "0.1.0",
+      "releaseDate": "2024-01-15",
+      "releaseNotes": "Initial release with WebSocket server and WebGPU rendering support.",
+      "releases": [
+        {
+          "platform": "macOS",
+          "arch": "aarch64",
+          "filename": "qemuweb-sidecar-0.1.0-macos-aarch64",
+          "downloadUrl": "/downloads/qemuweb-sidecar-0.1.0-macos-aarch64",
+          "size": "2.4 MB",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "platform": "macOS",
+          "arch": "x86_64",
+          "filename": "qemuweb-sidecar-0.1.0-macos-x86_64",
+          "downloadUrl": "/downloads/qemuweb-sidecar-0.1.0-macos-x86_64",
+          "size": "2.6 MB",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "platform": "Linux",
+          "arch": "x86_64",
+          "filename": "qemuweb-sidecar-0.1.0-linux-x86_64",
+          "downloadUrl": "/downloads/qemuweb-sidecar-0.1.0-linux-x86_64",
+          "size": "3.1 MB",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "platform": "Linux",
+          "arch": "aarch64",
+          "filename": "qemuweb-sidecar-0.1.0-linux-aarch64",
+          "downloadUrl": "/downloads/qemuweb-sidecar-0.1.0-linux-aarch64",
+          "size": "2.9 MB",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "platform": "Windows",
+          "arch": "x86_64",
+          "filename": "qemuweb-sidecar-0.1.0-windows-x86_64.exe",
+          "downloadUrl": "/downloads/qemuweb-sidecar-0.1.0-windows-x86_64.exe",
+          "size": "3.4 MB",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}
