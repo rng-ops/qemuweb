@@ -110,7 +110,10 @@ jobs:
   build-qemu-wasm:
     name: Build QEMU WASM
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[build-qemu]')
+    # Run on manual dispatch, [build-qemu] tag, or when qemu-wasm package changes
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      contains(github.event.head_commit.message, '[build-qemu]')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -185,8 +188,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build web app
-        run: pnpm --filter @qemuweb/web build
+      - name: Build all packages
+        run: pnpm build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
