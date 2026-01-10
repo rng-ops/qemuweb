@@ -1,0 +1,13 @@
+# Build artifacts
+/target/
+/dist/
+
+# Cargo lock is optional for libraries
+# Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

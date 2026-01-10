@@ -1,0 +1,82 @@
+[package]
+name = "qemuweb-sidecar"
+version = "0.1.0"
+edition = "2021"
+authors = ["QemuWeb Contributors"]
+description = "Native sidecar for BrowserQEMU - WebGPU rendering and host integration"
+license = "MIT"
+repository = "https://github.com/rng-ops/qemuweb"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "qemuweb-sidecar"
+path = "src/main.rs"
+required-features = ["native"]
+
+[features]
+default = ["native"]
+native = ["tokio/rt-multi-thread", "tokio/net", "tokio/fs", "tokio/signal", "tokio-tungstenite", "futures-util"]
+wasm = ["wasm-bindgen", "wasm-bindgen-futures", "js-sys", "web-sys", "console_error_panic_hook"]
+
+[dependencies]
+# Core
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+
+# Async runtime
+tokio = { version = "1", features = ["sync", "macros", "time"], default-features = false }
+
+# Native-only dependencies
+tokio-tungstenite = { version = "0.21", optional = true }
+tracing-subscriber = { version = "0.3", optional = true }
+futures-util = { version = "0.3", optional = true }
+
+# WASM-only dependencies
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[dependencies.web-sys]
+version = "0.3"
+optional = true
+features = [
+    "console",
+    "Window",
+    "Document",
+    "Navigator",
+    "Gpu",
+    "GpuAdapter",
+    "GpuDevice",
+    "GpuQueue",
+    "GpuBuffer",
+    "GpuTexture",
+    "GpuTextureDescriptor",
+    "GpuTextureFormat",
+    "GpuTextureUsage",
+    "WebSocket",
+    "MessageEvent",
+    "BinaryType",
+    "CloseEvent",
+    "ErrorEvent",
+]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+lto = true
+opt-level = "z"
+strip = true
+
+[profile.release-wasm]
+inherits = "release"
+opt-level = "s"
