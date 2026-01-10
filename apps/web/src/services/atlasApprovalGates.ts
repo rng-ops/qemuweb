@@ -374,10 +374,11 @@ class ApprovalGatesService {
           case 'approved':
             action.onApproved?.();
             break;
-          case 'rejected':
+          case 'rejected': {
             const reason = gate.rejections[0]?.reason || 'Rejected';
             action.onRejected?.(reason);
             break;
+          }
           case 'timeout':
             action.onTimeout?.();
             break;

@@ -585,14 +585,16 @@ Keep it concise (1-2 sentences). Be authentic in your reasoning.`;
     // Create the full prompt with context
     const contextualPrompt = `${userMessage}${memoryContext}${thoughtContext}`;
 
-    // Stream the response
-    const self = this;
+    // Stream the response - capture needed properties to avoid this alias
+    const llm = this.llm!;
+    const session = this.session!;
+    const generateThought = this.generateThought.bind(this);
     async function* streamResponse(): AsyncGenerator<string, void, unknown> {
       let fullResponse = '';
 
       try {
-        const stream = await self.llm!.stream([
-          ...self.session!.chatHistory.slice(0, -1), // All except last
+        const stream = await llm.stream([
+          ...session.chatHistory.slice(0, -1), // All except last
           new HumanMessage(contextualPrompt),
         ]);
 
@@ -605,11 +607,11 @@ Keep it concise (1-2 sentences). Be authentic in your reasoning.`;
         }
 
         // Add assistant response to history
-        self.session!.chatHistory.push(new AIMessage(fullResponse));
+        session.chatHistory.push(new AIMessage(fullResponse));
 
         // Generate a reflection thought about the conversation
         if (fullResponse.length > 100) {
-          await self.generateThought('reflection', 
+          await generateThought('reflection', 
             `Responded to user about: ${userMessage.slice(0, 50)}...`
           );
         }

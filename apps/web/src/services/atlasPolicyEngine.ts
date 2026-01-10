@@ -359,11 +359,12 @@ class PolicyEngineService {
         result = Number(fieldValue) < Number(condition.value);
         break;
         
-      case 'between':
+      case 'between': {
         const [min, max] = condition.value as [number, number];
         const num = Number(fieldValue);
         result = num >= min && num <= max;
         break;
+      }
         
       case 'in-list':
         result = (condition.value as unknown[]).includes(fieldValue);
@@ -445,7 +446,7 @@ class PolicyEngineService {
           }
           break;
           
-        case 'create-gate':
+        case 'create-gate': {
           const gates = getApprovalGates();
           gates.createGate({
             name: action.gateName || `Policy: ${policy.name}`,
@@ -464,6 +465,7 @@ class PolicyEngineService {
             },
           });
           break;
+        }
           
         case 'block':
           this.emitEvent('action:blocked', {

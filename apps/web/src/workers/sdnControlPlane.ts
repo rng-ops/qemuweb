@@ -748,7 +748,7 @@ self.onmessage = (event: MessageEvent<SDNCommand>) => {
       case 'remove_node':
         response = handleRemoveNode(command.nodeId);
         break;
-      case 'update_node':
+      case 'update_node': {
         const nodeToUpdate = state.nodes.get(command.nodeId);
         if (nodeToUpdate) {
           Object.assign(nodeToUpdate, command.updates);
@@ -757,13 +757,14 @@ self.onmessage = (event: MessageEvent<SDNCommand>) => {
           response = { type: 'error', message: `Node ${command.nodeId} not found` };
         }
         break;
+      }
       case 'add_link':
         response = handleAddLink(command.link);
         break;
       case 'remove_link':
         response = handleRemoveLink(command.linkId);
         break;
-      case 'update_link':
+      case 'update_link': {
         const linkToUpdate = state.links.get(command.linkId);
         if (linkToUpdate) {
           Object.assign(linkToUpdate, command.updates);
@@ -772,6 +773,7 @@ self.onmessage = (event: MessageEvent<SDNCommand>) => {
           response = { type: 'error', message: `Link ${command.linkId} not found` };
         }
         break;
+      }
       case 'add_network':
         response = handleAddNetwork(command.network);
         break;

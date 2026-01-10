@@ -1230,11 +1230,12 @@ class ExpertNetworkService {
         bid = bidding.minBid;
         break;
       
-      case 'adaptive':
+      case 'adaptive': {
         // Adjust based on resource type and priority
         const priorityMultiplier = bidding.priority / 100;
         bid = bidding.minBid + (bidding.maxBid - bidding.minBid) * priorityMultiplier;
         break;
+      }
     }
     
     return Math.min(bid, bidding.budget);
@@ -1713,10 +1714,9 @@ class ExpertNetworkService {
     
     try {
       const start = Date.now();
-      let rawOutput: string;
       
       // Use the expert's configured endpoint
-      rawOutput = await this.runOnEndpoint(expert, { system: systemPrompt, user: userPrompt });
+      const rawOutput = await this.runOnEndpoint(expert, { system: systemPrompt, user: userPrompt });
       
       const latencyMs = Date.now() - start;
       

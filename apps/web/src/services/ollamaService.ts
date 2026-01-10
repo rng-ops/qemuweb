@@ -394,10 +394,13 @@ class OllamaService {
 
       const decoder = new TextDecoder();
       let buffer = '';
+      let streamDone = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      while (!streamDone) {
+        const result = await reader.read();
+        streamDone = result.done;
+        if (streamDone) break;
+        const value = result.value;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -574,10 +577,13 @@ class OllamaService {
 
       const decoder = new TextDecoder();
       let buffer = '';
+      let chatDone = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      while (!chatDone) {
+        const result = await reader.read();
+        chatDone = result.done;
+        if (chatDone) break;
+        const value = result.value;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');

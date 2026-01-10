@@ -326,7 +326,7 @@ export const AtlasIframeApp: React.FC = () => {
         }
         break;
         
-      case 'main:dashboard-context':
+      case 'main:dashboard-context': {
         // Store dashboard context for the orchestrator
         const dashCtx = getDashboardContext();
         console.log('[AtlasIframeAppV2] Received dashboard context:', message.payload);
@@ -351,6 +351,7 @@ export const AtlasIframeApp: React.FC = () => {
           },
         }].slice(-200));
         break;
+      }
     }
   }, []);
 

@@ -145,13 +145,14 @@ export const IDELayout: React.FC = () => {
       const ai = getAIService();
 
       switch (type) {
-        case 'diagram':
+        case 'diagram': {
           const diagram = await ai.generateDiagram(
             `Generate a diagram for the infrastructure in ${file.name}`
           );
           console.log('Generated diagram:', diagram);
           setStatusMessage('Diagram generated');
           break;
+        }
 
         case 'validate':
           setStatusMessage('Validating configuration...');
@@ -163,7 +164,7 @@ export const IDELayout: React.FC = () => {
           setStatusMessage('Plan applied');
           break;
 
-        case 'terraform':
+        case 'terraform': {
           // Generate Terraform for the file's associated container
           const containerType = file.tags?.find((t) => ['base', 'hypervisor', 'agent'].includes(t));
           const image = images.find((img) => img.type === containerType);
@@ -172,6 +173,7 @@ export const IDELayout: React.FC = () => {
             setStatusMessage('Terraform plan generated');
           }
           break;
+        }
 
         default:
           setStatusMessage(`Unknown action: ${type}`);
