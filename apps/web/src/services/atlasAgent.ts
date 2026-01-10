@@ -14,7 +14,7 @@ import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from '@langchain/
 import { v4 as uuidv4 } from 'uuid';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { getMemoryStore, type MemoryEntry } from './vectorMemory';
-import { getDOMObserver, type DOMSnapshot } from './domObserver';
+import { domObserver, type DOMSnapshot } from './domObserver';
 
 // ============ Types ============
 
@@ -322,14 +322,13 @@ Current timestamp: ${new Date().toISOString()}`;
     if (!this.session || this.config.thinkingMode === 'quiet') return;
 
     try {
-      const domObserver = getDOMObserver();
       const snapshot = domObserver.getSnapshot();
       const recentChanges = domObserver.getChangeHistory().slice(-10);
 
       // Only generate thought if there are meaningful changes and we have a snapshot
       if (snapshot && recentChanges.length > 0) {
         const changesSummary = recentChanges
-          .map(c => `${c.type}: ${c.description}`)
+          .map((c: { type: string; description: string }) => `${c.type}: ${c.description}`)
           .join('\n');
 
         await this.generateObservationThought(snapshot, changesSummary);
