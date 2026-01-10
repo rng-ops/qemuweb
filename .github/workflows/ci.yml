@@ -194,8 +194,8 @@ jobs:
       - name: Build docs site
         run: |
           cd docs-site
-          pnpm install
-          pnpm build
+          npm install
+          npx astro build
           ls -la dist/
 
       - name: Copy docs into web app
