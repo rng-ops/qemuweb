@@ -223,11 +223,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build all packages
+        run: pnpm build
+
       - name: Install Playwright browsers
         run: pnpm --filter @qemuweb/web exec playwright install --with-deps chromium
-
-      - name: Build web app
-        run: pnpm --filter @qemuweb/web build
 
       - name: Run E2E tests
         run: pnpm --filter @qemuweb/web test:e2e
